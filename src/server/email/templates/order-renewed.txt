@@ -1,0 +1,16 @@
+Your subscription renewed
+
+Hi {{name}}, thank you! Your {{item}} subscription continues.
+
+Order:        {{orderNumber}}
+Plan:         {{billing}}
+{{#amount}}
+Paid:         {{amount}}
+{{/amount}}
+Active until: {{until}}
+
+Questions? Write to {{supportEmail}}.
+
+---
+You received this email because of your account {{email}} on {{appName}}.
+© {{year}} {{platformName}}

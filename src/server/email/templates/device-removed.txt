@@ -1,0 +1,13 @@
+A device was removed
+
+Hi {{name}}, this device can no longer use your {{appName}} account:
+
+Device:    {{deviceName}}
+Device ID: {{deviceUid}}
+When:      {{when}}
+
+You can sign in on another device now. Questions? Write to {{supportEmail}}.
+
+---
+You received this email because of your account {{email}} on {{appName}}.
+© {{year}} {{platformName}}

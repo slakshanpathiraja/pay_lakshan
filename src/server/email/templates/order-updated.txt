@@ -1,0 +1,15 @@
+{{headline}}
+
+Hi {{name}}, {{message}}
+
+Order:   {{orderNumber}}
+Payment: {{paymentStatus}}
+Status:  {{orderStatus}}
+{{#payUrl}}
+Pay now: {{payUrl}}
+{{/payUrl}}
+Questions? Write to {{supportEmail}}.
+
+---
+You received this email because of your account {{email}} on {{appName}}.
+© {{year}} {{platformName}}

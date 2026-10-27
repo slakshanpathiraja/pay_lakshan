@@ -1,0 +1,13 @@
+Thanks for your order, {{name}}
+
+Order {{orderNumber}} · {{billing}}
+
+{{itemLines}}
+Total: {{total}}
+{{#payUrl}}
+Your order starts as soon as it's paid. Pay here (link works until {{payUntil}}):
+{{payUrl}}
+{{/payUrl}}
+---
+You received this email because of your account {{email}} on {{appName}}.
+© {{year}} {{platformName}}

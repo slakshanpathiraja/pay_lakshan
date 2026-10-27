@@ -1,0 +1,13 @@
+Welcome, {{name}}!
+
+Your {{appName}} account is ready. You can sign in with: {{email}}
+
+If you didn't create this account, you can ignore this email, or let us know and we'll look into it.
+
+Questions? Just reply, or write to {{supportEmail}}.
+
+— The {{appName}} team
+
+---
+You received this email because an account was created for {{email}} on {{appName}}.
+© {{year}} {{platformName}}

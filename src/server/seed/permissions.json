@@ -1,0 +1,909 @@
+{
+  "$comment": "Inserted on the first run only (tracked in app_meta). `permissions`: cards with a unique `key`; `urls` are frontend pages (kind \"page\") and backend endpoints (kind \"api\" + method), each tagged with what it is used for (view / create / edit / delete). Actions are levels (view < create < edit < delete): a grant includes the levels below it. `newPlatform.managerGrants`: what the built-in Manager role of every new platform gets. `platforms`: demo platforms with their extra roles and members (role per platform). `users`: demo accounts (password DEMO_USER_PASSWORD, changed on first sign in). Grants are keyed by card key. Status changes are separate child cards (`parent`), e.g. \"manager-status\" under \"managers\". Super Admin always gets every action of every card.",
+  "permissions": [
+    {
+      "key": "dashboard",
+      "name": "Dashboard",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/",
+          "actions": [
+            "view"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "users",
+      "name": "Users",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/users",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/users",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/users",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/users/{id}",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/users/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "devices",
+      "name": "Devices",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/devices",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/devices",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/devices",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/users",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/devices/{id}",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/devices/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "orders",
+      "name": "Orders",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/orders",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/orders",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/orders/{id}",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/orders",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/users",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/order-templates",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/orders/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "managers",
+      "name": "Managers",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/managers",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/managers",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/managers",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/managers/{id}/role",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/managers/{id}/reset-password",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/managers/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "roles",
+      "name": "Roles",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/roles",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/roles",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/permissions",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/roles",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/roles/{id}",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/roles/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "permissions",
+      "name": "Permissions",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/permissions",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/permissions",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/permissions/catalog",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/permissions",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/permissions/{id}",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/permissions/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smtp-servers",
+      "name": "SMTP servers",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/smtp-servers",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/smtp-servers",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/smtp-servers",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/smtp-servers/{id}",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/smtp-servers/{id}/test",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/smtp-servers/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "platforms",
+      "name": "Platforms",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/platforms",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/platforms",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/platforms",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/platforms/{id}",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/platforms/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "apps",
+      "name": "Apps",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/apps",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/apps",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/apps",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/apps/{id}",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/apps/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "platform-status",
+      "name": "Platform status",
+      "parent": "platforms",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/platforms/{id}/status",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "platform-own-update",
+      "name": "Own platform update",
+      "parent": "platforms",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/platforms/current",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "manager-status",
+      "name": "Manager status",
+      "parent": "managers",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/managers/{id}/status",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "role-status",
+      "name": "Role status",
+      "parent": "roles",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/roles/{id}/status",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "smtp-status",
+      "name": "SMTP server status",
+      "parent": "smtp-servers",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/smtp-servers/{id}/status",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "app-credentials",
+      "name": "App credentials",
+      "parent": "apps",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/apps/{id}/credentials",
+          "actions": [
+            "view"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "app-config",
+      "name": "App config",
+      "parent": "apps",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/apps/config",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/apps/{id}/config",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/apps/{id}/config",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "user-status",
+      "name": "User status",
+      "parent": "users",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/users/{id}/status",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "device-status",
+      "name": "Device status",
+      "parent": "devices",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/devices/{id}/status",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "order-payment",
+      "name": "Order payment status",
+      "parent": "orders",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/orders/{id}/payment-status",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "order-status",
+      "name": "Order status",
+      "parent": "orders",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/orders/{id}/order-status",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/orders/{id}/renew",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "order-checkout",
+      "name": "Order payment link",
+      "parent": "orders",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/orders/{id}/checkout",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "order-templates",
+      "name": "Order templates",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/order-templates",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/order-templates",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "POST",
+          "path": "/api/order-templates",
+          "actions": [
+            "create"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "PUT",
+          "path": "/api/order-templates/{id}",
+          "actions": [
+            "edit"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "DELETE",
+          "path": "/api/order-templates/{id}",
+          "actions": [
+            "delete"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "order-template-status",
+      "name": "Order template status",
+      "parent": "order-templates",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/order-templates/{id}/status",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "payments",
+      "name": "Payments",
+      "urls": [
+        {
+          "kind": "page",
+          "path": "/payments",
+          "actions": [
+            "view"
+          ]
+        },
+        {
+          "kind": "api",
+          "method": "GET",
+          "path": "/api/payments",
+          "actions": [
+            "view"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "user-device-limit",
+      "name": "User allowed devices",
+      "parent": "users",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/users/{id}/max-devices",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    },
+    {
+      "key": "user-pending-limit",
+      "name": "User pending order limit",
+      "parent": "users",
+      "urls": [
+        {
+          "kind": "api",
+          "method": "PATCH",
+          "path": "/api/users/{id}/max-pending-orders",
+          "actions": [
+            "edit"
+          ]
+        }
+      ]
+    }
+  ],
+  "newPlatform": {
+    "managerGrants": {
+      "dashboard": [
+        "view"
+      ]
+    }
+  },
+  "platforms": [
+    {
+      "name": "Lakshan Pay",
+      "roles": [
+        {
+          "name": "Viewer",
+          "grants": {
+            "dashboard": [
+              "view"
+            ],
+            "managers": [
+              "view"
+            ],
+            "roles": [
+              "view"
+            ],
+            "permissions": [
+              "view"
+            ],
+            "platforms": [
+              "view"
+            ],
+            "smtp-servers": [
+              "view"
+            ]
+          }
+        },
+        {
+          "name": "Account admin",
+          "grants": {
+            "dashboard": [
+              "view"
+            ],
+            "managers": [
+              "edit"
+            ],
+            "platforms": [
+              "view"
+            ],
+            "manager-status": [
+              "edit"
+            ]
+          }
+        }
+      ],
+      "members": [
+        {
+          "username": "kasun",
+          "role": "Account admin"
+        },
+        {
+          "username": "nimal",
+          "role": "Manager"
+        }
+      ]
+    },
+    {
+      "name": "Demo Store",
+      "roles": [
+        {
+          "name": "Viewer",
+          "grants": {
+            "dashboard": [
+              "view"
+            ],
+            "managers": [
+              "view"
+            ],
+            "roles": [
+              "view"
+            ],
+            "permissions": [
+              "view"
+            ],
+            "platforms": [
+              "view"
+            ],
+            "smtp-servers": [
+              "view"
+            ]
+          }
+        }
+      ],
+      "members": [
+        {
+          "username": "kasun",
+          "role": "Viewer"
+        },
+        {
+          "username": "amali",
+          "role": "Manager"
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "kasun",
+      "fullName": "Kasun Perera"
+    },
+    {
+      "username": "nimal",
+      "fullName": "Nimal Silva"
+    },
+    {
+      "username": "amali",
+      "fullName": "Amali Fernando"
+    }
+  ]
+}

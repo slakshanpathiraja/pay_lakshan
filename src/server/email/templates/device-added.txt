@@ -1,0 +1,13 @@
+A new device was added
+
+Hi {{name}}, this device can now use your {{appName}} account:
+
+Device:    {{deviceName}}
+Device ID: {{deviceUid}}
+When:      {{when}}
+
+If this wasn't you, contact us right away at {{supportEmail}}.
+
+---
+You received this email because of your account {{email}} on {{appName}}.
+© {{year}} {{platformName}}

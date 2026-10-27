@@ -18,6 +18,9 @@ const schema = z.object({
     .optional()
     .transform((v) => v === "true" || v === "1"),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
+  /** Public base URL/host of the app (e.g. https://pay4.lakshan.dev) used for Stripe redirects and checkout */
+  APP_URL: z.string().trim().optional(),
+  HOST: z.string().trim().optional(),
   /** encrypts stored secrets (SMTP passwords); falls back to a key derived from JWT_SECRET */
   APP_ENCRYPTION_KEY: z.string().min(32).optional(),
   SESSION_TTL_HOURS: z.coerce.number().positive().default(8),
@@ -70,6 +73,17 @@ const schema = z.object({
     .trim()
     .optional()
     .transform((v) => v || undefined),
+  /** Sign in with Google in apps: the OAuth Web client ids apps get ID tokens for (comma separated) */
+  GOOGLE_SIGNIN_CLIENT_IDS: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) =>
+      v
+        ?.split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
 });
 
 let cached: z.infer<typeof schema> | null = null;
@@ -81,10 +95,39 @@ export function getConfig() {
   const env = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
   const parsed = schema.safeParse(env);
   if (!parsed.success) {
-    throw new Error(
-      `Invalid server environment: ${JSON.stringify(z.treeifyError(parsed.error))}`,
-    );
+    // names and reasons only, never the values (they are secrets)
+    const problems = parsed.error.issues
+      .map((i) => `${i.path.join(".") || "(env)"}: ${i.message}`)
+      .join("; ");
+    throw new Error(`Invalid server environment — ${problems}`);
   }
   cached = parsed.data;
   return cached;
+}
+
+/**
+ * Resolves the public base URL (origin) of the portal.
+ * Prioritizes APP_URL or HOST from config/.env, then falls back to request headers
+ * (x-forwarded-host / x-forwarded-proto), then req.url origin, and finally localhost:3000.
+ */
+export function getAppOrigin(req?: Request): string {
+  const cfg = getConfig();
+  const configured = cfg.APP_URL || cfg.HOST;
+  if (configured) {
+    const trimmed = configured.trim().replace(/\/+$/, "");
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  }
+  if (req) {
+    const forwardedHost = req.headers.get("x-forwarded-host");
+    const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
+    if (forwardedHost) {
+      return `${forwardedProto}://${forwardedHost.split(",")[0].trim()}`;
+    }
+    try {
+      return new URL(req.url).origin;
+    } catch {
+      // invalid URL
+    }
+  }
+  return "http://localhost:3000";
 }

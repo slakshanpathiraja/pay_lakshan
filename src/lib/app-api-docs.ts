@@ -92,11 +92,12 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
     path: "/api/webhooks/user",
     title: "Sign in user",
     summary:
-      "Signs your app's user in with email + password and returns their tokens. An email your app doesn't have yet is signed up.",
+      "Signs your app's user in with email + password, or with the Google account they picked on the device (Sign in with Google), and returns their tokens. An email your app doesn't have yet is signed up.",
     token: false,
     params: [
-      { name: "email", required: true, description: "The user's email (not case sensitive).", example: SAMPLE_EMAIL },
-      { name: "password", required: true, description: "At least 8 characters.", example: "Demo@12345", secret: true },
+      { name: "email", required: "if", description: "The user's email (not case sensitive). With `password`; not with `googleIdToken`.", example: SAMPLE_EMAIL },
+      { name: "password", required: "if", description: "At least 8 characters. With `email`.", example: "Demo@12345", secret: true },
+      { name: "googleIdToken", required: "if", description: "Sign in with Google instead of email + password: the ID token Google gave the app for the account the user picked (`idToken` from Google Sign-In, requested with your OAuth Web client id). The email comes from Google, already verified.", example: "", secret: true },
     ],
     responses: [
       {
@@ -111,14 +112,18 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
       },
     ],
     errors: [
-      { status: 401, code: "APP_USER_LOGIN_FAILED", when: "Wrong password for this email." },
+      { status: 401, code: "APP_USER_LOGIN_FAILED", when: "Wrong password for this email, or the email belongs to a different Google account." },
+      { status: 401, code: "APP_USER_USE_GOOGLE", when: "Email + password for a user who signs in with Google (they have no password)." },
+      { status: 401, code: "GOOGLE_TOKEN_INVALID", when: "`googleIdToken` isn't a valid, unexpired Google ID token for one of the server's client ids, or its email isn't verified." },
+      { status: 503, code: "GOOGLE_SIGNIN_NOT_CONFIGURED", when: "The server has no `GOOGLE_SIGNIN_CLIENT_IDS`." },
       { status: 403, code: "ACCOUNT_DISABLED", when: "The user was turned off in the dashboard." },
       { status: 429, code: "TOO_MANY_ATTEMPTS", when: "More than 10 tries for this email in 15 minutes." },
     ],
     notes: [
       "`accessToken` works for 1 hour — send it as `Authorization: Bearer <accessToken>` to /device, /order and /verify.",
       "`refreshToken` works for 30 days — use it with /refresh to get a new access token without asking for the password again.",
-      "A user added in the dashboard (no password yet) sets their password with their first call.",
+      "A user added in the dashboard (no password yet) sets their password with their first call — or links their Google account.",
+      "Sign in with Google: no password and no email check — the first sign-in with a Google account creates the user (name and email from Google). The same email signed up with a password links that Google account.",
       "Store both tokens securely on the device (Keychain / Keystore), never in plain files.",
     ],
   },

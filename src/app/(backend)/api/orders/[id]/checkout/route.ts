@@ -1,4 +1,5 @@
 import { route } from "@/server/api/route";
+import { getAppOrigin } from "@/server/config";
 import { withTransaction } from "@/server/db/pool";
 import { ApiError, json } from "@/server/http";
 import { messageFor } from "@/server/messages";
@@ -12,7 +13,7 @@ export const POST = route("orders.checkout", async ({ req, scope, params }) => {
       [params.id, scope.platformId],
     );
     if (!rowCount) throw new ApiError(404, "NOT_FOUND");
-    return createCheckout(client, params.id, new URL(req.url).origin);
+    return createCheckout(client, params.id, getAppOrigin(req));
   });
   if (!link) throw new ApiError(409, "STRIPE_NOT_CONFIGURED");
   return json({ ...link, message: messageFor(req, "notices.payLinkCreated") });

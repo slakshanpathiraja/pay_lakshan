@@ -32,6 +32,7 @@ const si: Messages = {
     docs: "ලේඛන",
     docStripe: "Stripe",
     docGooglePlay: "Google Play",
+    docAppWebhooks: "ඇප් webhooks",
     orderTemplates: "ඇණවුම් templates",
     webhookGooglePlay: "Google Play webhook",
     webhookStripe: "Stripe webhook",
@@ -728,6 +729,14 @@ const si: Messages = {
     cancelledTitle: "ගෙවීම අවලංගු කළා",
     cancelledText:
       "ඔබෙන් මුදල් අය කළේ නැත. ගෙවීමට එම සබැඳියම නැවත විවෘත කරන්න.",
+    pendingTitle: "ගෙවීම සැකසෙමින්",
+    pendingText:
+      "ඇණවුම {number} ගෙවීම සම්පූර්ණ වන තෙක් රැඳී සිටී. එය සම්පූර්ණ වූ විගස සක්‍රිය වේ.",
+    failedTitle: "ගෙවීම අසාර්ථකයි",
+    failedText:
+      "ඇණවුම {number} සඳහා ගෙවීම සාර්ථක වූයේ නැත. එම ගෙවීම් සබැඳියෙන්ම නැවත උත්සාහ කරන්න.",
+    redirecting: "ගෙවීම පරීක්ෂා කළා — ඔබව ආපසු යවමින්…",
+    continue: "ඉදිරියට",
   },
   webhooks: {
     setup: "සැකසීම",
@@ -818,6 +827,9 @@ const si: Messages = {
     TEMPLATE_INACTIVE: "මෙම order template එක අක්‍රිය කර ඇත",
     TEMPLATE_CODE_TAKEN: "මෙම app එකට මෙම code සහිත template එකක් දැනටමත් ඇත",
     GOOGLE_PLAY_NOT_CONFIGURED: "සේවාදායකයේ Google Play සකසා නැත (GOOGLE_PLAY_SERVICE_ACCOUNT / GOOGLE_PLAY_PUSH_AUDIENCE)",
+    GOOGLE_SIGNIN_NOT_CONFIGURED: "සේවාදායකයේ Google පිවිසුම සකසා නැත (GOOGLE_SIGNIN_CLIENT_IDS)",
+    GOOGLE_TOKEN_INVALID: "Google පිවිසුම තහවුරු කළ නොහැකි විය — Google සමඟ නැවත පිවිසෙන්න",
+    APP_USER_USE_GOOGLE: "මෙම ගිණුම Google සමඟ පිවිසේ",
     GOOGLE_PLAY_ERROR: "Google Play ඉල්ලීම ප්‍රතික්ෂේප කළේය",
     GOOGLE_PLAY_PURCHASE_INVALID: "Google Play මෙම මිලදී ගැනීම නොදනී — package, product id සහ purchase token පරීක්ෂා කරන්න",
     GOOGLE_PLAY_TYPE_MISMATCH: "Subscription එකකට subscription ඇණවුමක් පමණක්, one-time product එකකට one-time ඇණවුමක් පමණක් ගෙවිය හැක",

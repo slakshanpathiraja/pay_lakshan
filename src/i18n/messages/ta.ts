@@ -32,6 +32,7 @@ const ta: Messages = {
     docs: "ஆவணங்கள்",
     docStripe: "Stripe",
     docGooglePlay: "Google Play",
+    docAppWebhooks: "ஆப் webhooks",
     orderTemplates: "ஆர்டர் templates",
     webhookGooglePlay: "Google Play webhook",
     webhookStripe: "Stripe webhook",
@@ -752,6 +753,14 @@ const ta: Messages = {
     cancelledTitle: "கட்டணம் ரத்து செய்யப்பட்டது",
     cancelledText:
       "உங்களிடம் கட்டணம் வசூலிக்கப்படவில்லை. செலுத்த அதே இணைப்பை மீண்டும் திறக்கவும்.",
+    pendingTitle: "கட்டணம் செயலாக்கத்தில்",
+    pendingText:
+      "ஆர்டர் {number} கட்டணம் முடியும் வரை காத்திருக்கிறது. முடிந்தவுடன் செயலில் வரும்.",
+    failedTitle: "கட்டணம் தோல்வியடைந்தது",
+    failedText:
+      "ஆர்டர் {number} க்கான கட்டணம் வெற்றிபெறவில்லை. அதே கட்டண இணைப்பில் மீண்டும் முயற்சிக்கவும்.",
+    redirecting: "கட்டணம் சரிபார்க்கப்பட்டது — உங்களைத் திருப்பி அனுப்புகிறோம்…",
+    continue: "தொடரவும்",
   },
   webhooks: {
     setup: "அமைப்பு",
@@ -842,6 +851,9 @@ const ta: Messages = {
     TEMPLATE_INACTIVE: "இந்த order template அணைக்கப்பட்டுள்ளது",
     TEMPLATE_CODE_TAKEN: "இந்த app இல் இந்த code உடன் template ஏற்கனவே உள்ளது",
     GOOGLE_PLAY_NOT_CONFIGURED: "சேவையகத்தில் Google Play அமைக்கப்படவில்லை (GOOGLE_PLAY_SERVICE_ACCOUNT / GOOGLE_PLAY_PUSH_AUDIENCE)",
+    GOOGLE_SIGNIN_NOT_CONFIGURED: "சேவையகத்தில் Google உள்நுழைவு அமைக்கப்படவில்லை (GOOGLE_SIGNIN_CLIENT_IDS)",
+    GOOGLE_TOKEN_INVALID: "Google உள்நுழைவை சரிபார்க்க முடியவில்லை — Google மூலம் மீண்டும் உள்நுழையவும்",
+    APP_USER_USE_GOOGLE: "இந்தக் கணக்கு Google மூலம் உள்நுழைகிறது",
     GOOGLE_PLAY_ERROR: "Google Play கோரிக்கையை நிராகரித்தது",
     GOOGLE_PLAY_PURCHASE_INVALID: "Google Play இந்த வாங்குதலை அறியவில்லை — package, product id, purchase token ஐச் சரிபார்க்கவும்",
     GOOGLE_PLAY_TYPE_MISMATCH: "Subscription ஆனது subscription ஆர்டரையும், one-time product ஆனது one-time ஆர்டரையும் மட்டுமே செலுத்த முடியும்",

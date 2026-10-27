@@ -318,6 +318,7 @@ async function migrate() {
   await migrateEmailOutbox();
   await migrateGooglePlay();
   await migrateOrderTemplates();
+  await migrateAppWebhookOutbox();
   await resetForPlatforms();
 }
 
@@ -983,6 +984,11 @@ async function migratePayments() {
  */
 async function migrateAppApi() {
   await query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(100)`);
+  // Sign in with Google: the Google account's id (`sub`); such a user may have no password
+  await query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255)`);
+  await query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS app_users_google_sub_key ON app_users (app_id, google_sub) WHERE google_sub IS NOT NULL`,
+  );
   await query(`
     CREATE TABLE IF NOT EXISTS app_user_tokens (
       id           SERIAL PRIMARY KEY,
@@ -1007,6 +1013,78 @@ async function migrateAppApi() {
  * by triggers, so every way they change (dashboard, App API, Stripe webhook, expiry) is
  * covered; several changes to one order in one transaction make one email.
  */
+/**
+ * App webhooks (App config → Webhooks): every order change is POSTed to each of the app's
+ * webhook URLs — created, paid, renewed, failed, expired, cancelled, from any source
+ * (Stripe, Google Play, the dashboard, the expiry cron). Queued by a trigger in the same
+ * transaction as the change, sent after the request and by the health check, retried.
+ */
+async function migrateAppWebhookOutbox() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS webhook_outbox (
+      id               BIGSERIAL     PRIMARY KEY,
+      app_id           INT           NOT NULL REFERENCES apps (id) ON DELETE CASCADE,
+      url              VARCHAR(2000) NOT NULL,
+      event            VARCHAR(40)   NOT NULL,
+      order_id         INT           NOT NULL REFERENCES orders (id) ON DELETE CASCADE,
+      data             JSONB         NOT NULL DEFAULT '{}',
+      dedupe_key       VARCHAR(200),
+      status           VARCHAR(10)   NOT NULL DEFAULT 'pending'
+                                     CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
+      attempts         SMALLINT      NOT NULL DEFAULT 0,
+      next_attempt_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
+      last_error       VARCHAR(500),
+      response_status  SMALLINT,
+      created_at       TIMESTAMPTZ   NOT NULL DEFAULT now(),
+      sent_at          TIMESTAMPTZ
+    );
+  `);
+  await query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS webhook_outbox_dedupe_idx ON webhook_outbox (dedupe_key) WHERE dedupe_key IS NOT NULL`,
+  );
+  await query(
+    `CREATE INDEX IF NOT EXISTS webhook_outbox_due_idx ON webhook_outbox (next_attempt_at) WHERE status IN ('pending', 'sending')`,
+  );
+  await query(`
+    CREATE OR REPLACE FUNCTION webhook_outbox_order() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    DECLARE ev TEXT;
+    BEGIN
+      IF TG_OP = 'INSERT' THEN
+        ev := 'order.created';
+      ELSIF NEW.payment_status = OLD.payment_status AND NEW.order_status = OLD.order_status THEN
+        -- same statuses: only a renewal (the end moved forward while active and paid) is news
+        IF NEW.order_status = 'active' AND NEW.payment_status = 'paid'
+           AND OLD.ends_at IS NOT NULL AND NEW.ends_at > OLD.ends_at THEN
+          ev := 'order.renewed';
+        ELSE
+          RETURN NULL;
+        END IF;
+      ELSE
+        ev := 'order.updated';
+      END IF;
+      -- one delivery per URL per order per transaction: the first old statuses are kept, the
+      -- order itself is read when it is sent
+      INSERT INTO webhook_outbox (app_id, url, event, order_id, data, dedupe_key)
+      SELECT NEW.app_id, w.url, ev, NEW.id,
+             CASE WHEN TG_OP = 'INSERT' THEN '{}'::jsonb
+                  ELSE jsonb_build_object('oldPayment', OLD.payment_status, 'oldStatus', OLD.order_status) END,
+             ev || ':' || NEW.id || ':' || w.id || ':' || txid_current()
+        FROM app_webhooks w
+       WHERE w.app_id = NEW.app_id
+      ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING;
+      RETURN NULL;
+    END
+    $fn$
+  `);
+  await query(`DROP TRIGGER IF EXISTS orders_app_webhooks ON orders`);
+  await query(`
+    CREATE TRIGGER orders_app_webhooks AFTER INSERT OR UPDATE OF payment_status, order_status, ends_at ON orders
+      FOR EACH ROW EXECUTE FUNCTION webhook_outbox_order()
+  `);
+  // delivered ones are kept a month for checking
+  await query(`DELETE FROM webhook_outbox WHERE status = 'sent' AND created_at < now() - interval '30 days'`);
+}
+
 async function migrateEmailOutbox() {
   await query(`
     CREATE TABLE IF NOT EXISTS email_outbox (
@@ -1308,7 +1386,7 @@ async function patchDirectOrders() {
 }
 
 // Bump when migrate() changes so a hot-reloaded dev server re-runs it.
-const SCHEMA_VERSION = 41;
+const SCHEMA_VERSION = 43;
 
 const globalForInit = globalThis as unknown as {
   dbReady?: Promise<void>;

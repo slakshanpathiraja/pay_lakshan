@@ -30,6 +30,7 @@ const en = {
     docs: "Docs",
     docStripe: "Stripe",
     docGooglePlay: "Google Play",
+    docAppWebhooks: "App webhooks",
     orderTemplates: "Order templates",
     webhookGooglePlay: "Google Play webhook",
     webhookStripe: "Stripe webhook",
@@ -729,6 +730,14 @@ const en = {
     cancelledTitle: "Payment cancelled",
     cancelledText:
       "You weren't charged. Open the same payment link again to pay.",
+    pendingTitle: "Payment processing",
+    pendingText:
+      "Order {number} is waiting for the payment to go through. It becomes active as soon as it does.",
+    failedTitle: "Payment failed",
+    failedText:
+      "The payment for order {number} didn't go through. You can try again with the same payment link.",
+    redirecting: "Payment checked.taking you back…",
+    continue: "Continue",
   },
   webhooks: {
     setup: "Setup",
@@ -819,6 +828,9 @@ const en = {
     TEMPLATE_INACTIVE: "This order template is turned off",
     TEMPLATE_CODE_TAKEN: "This app already has a template with this code",
     GOOGLE_PLAY_NOT_CONFIGURED: "Google Play isn't set up on the server (GOOGLE_PLAY_SERVICE_ACCOUNT / GOOGLE_PLAY_PUSH_AUDIENCE)",
+    GOOGLE_SIGNIN_NOT_CONFIGURED: "Sign in with Google isn't set up on the server (GOOGLE_SIGNIN_CLIENT_IDS)",
+    GOOGLE_TOKEN_INVALID: "The Google sign-in couldn't be verified — sign in with Google again",
+    APP_USER_USE_GOOGLE: "This account signs in with Google",
     GOOGLE_PLAY_ERROR: "Google Play refused the request",
     GOOGLE_PLAY_PURCHASE_INVALID: "Google Play doesn't know this purchase — check the package, product id and purchase token",
     GOOGLE_PLAY_TYPE_MISMATCH: "A subscription can only pay a subscription order, and a one-time product a one-time order",

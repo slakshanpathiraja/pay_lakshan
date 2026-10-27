@@ -439,11 +439,17 @@ const digits = (min: number, max: number) =>
     .regex(/^\d{1,4}$/, "A whole number")
     .refine((v) => Number(v) >= min && Number(v) <= max, `Between ${min} and ${max}`);
 
-export const apiUserSchema = z.strictObject({
-  ...signed,
-  email: apiEmail,
-  password: z.string().min(8, "At least 8 characters").max(128),
-});
+export const apiUserSchema = z
+  .strictObject({
+    ...signed,
+    email: apiEmail.optional(),
+    password: z.string().min(8, "At least 8 characters").max(128).optional(),
+    /** Sign in with Google: the ID token the app got from Google — instead of email + password */
+    googleIdToken: z.string().min(1).max(4096).optional(),
+  })
+  .refine((o) => (o.googleIdToken ? !o.email && !o.password : !!o.email && !!o.password), {
+    message: "Send either googleIdToken, or email + password (not both)",
+  });
 export const apiDeviceSchema = z.strictObject({
   ...signed,
   deviceUid: z.string().min(1).max(191),

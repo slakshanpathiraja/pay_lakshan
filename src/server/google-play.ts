@@ -156,7 +156,7 @@ export function playClient(): PlayClient | null {
 
 // --- Pub/Sub push authentication ---------------------------------------------------------
 
-const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
+export const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 
 /**
  * A push request from Pub/Sub carries a Google-signed OIDC token (push subscription →

@@ -1,7 +1,7 @@
 import "server-only";
 import Stripe from "stripe";
 import type pg from "pg";
-import { getConfig } from "./config";
+import { getConfig, getAppOrigin } from "./config";
 import { ApiError } from "./errors";
 
 // One Stripe account for every platform, from the environment (STRIPE_SECRET_KEY). Orders
@@ -87,7 +87,7 @@ function returnUrl(url: string, orderNumber: string, withSession: boolean) {
 export async function createCheckout(
   client: pg.PoolClient,
   orderId: number,
-  origin: string,
+  origin?: string,
 ) {
   const { rows } = await client.query<CheckoutOrder>(
     `SELECT o.id, o.platform_id, o.app_id, o.order_number, o.payment_status, o.currency, o.billing,
@@ -131,15 +131,6 @@ export async function createCheckout(
       "SELECT name, quantity, unit_amount::float8 AS unit_amount FROM order_items WHERE order_id = $1 ORDER BY id",
       [order.id],
     );
-    const { rows: redirects } = await client.query<{
-      status: string;
-      url: string;
-    }>(
-      "SELECT status, url FROM app_redirects WHERE app_id = $1 AND status IN ('success', 'cancelled')",
-      [order.app_id],
-    );
-    const redirect = (status: string) =>
-      redirects.find((r) => r.status === status)?.url;
     const subscription = order.billing === "recurring";
     const metadata = {
       order_id: String(order.id),
@@ -147,6 +138,15 @@ export async function createCheckout(
       platform_id: order.platform_id,
       app_id: String(order.app_id),
     };
+
+    const baseOrigin =
+      getConfig().APP_URL || getConfig().HOST
+        ? getAppOrigin()
+        : (origin ?? getAppOrigin());
+
+    // Stripe always comes back to our page: it reads the order's real status and sends the
+    // customer on to the app's redirect for that status (App config), if it has one
+    const resolveRedirect = (status: "success" | "cancelled") => `${baseOrigin}/checkout/${status}`;
 
     const session = await stripe.checkout.sessions.create({
       mode: subscription ? "subscription" : "payment",
@@ -178,12 +178,12 @@ export async function createCheckout(
             }),
           }),
       success_url: returnUrl(
-        redirect("success") ?? `${origin}/checkout/success`,
+        resolveRedirect("success"),
         order.order_number,
         true,
       ),
       cancel_url: returnUrl(
-        redirect("cancelled") ?? `${origin}/checkout/cancelled`,
+        resolveRedirect("cancelled"),
         order.order_number,
         false,
       ),

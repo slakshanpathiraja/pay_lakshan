@@ -219,6 +219,13 @@ export const menuGroups: MenuGroup[] = [
         icon: BookOpen,
         access: "authenticated",
       },
+      {
+        key: "doc-app-webhooks",
+        title: "menu.docAppWebhooks",
+        href: "/docs/app-webhooks",
+        icon: BookOpen,
+        access: "authenticated",
+      },
     ],
   },
 ];

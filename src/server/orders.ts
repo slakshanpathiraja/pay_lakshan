@@ -5,6 +5,7 @@ import { query, withTransaction } from "./db/pool";
 import { enqueueEmail } from "./email/outbox";
 import { ApiError } from "./errors";
 import { errorMessage } from "./messages";
+import { getAppOrigin } from "./config";
 import { createCheckout } from "./stripe";
 
 export interface NewOrder {
@@ -113,7 +114,9 @@ export async function createOrder(input: NewOrder, req: Request) {
   let checkoutError: string | null = null;
   try {
     if (input.createCheckout !== false) {
-      checkout = await withTransaction((client) => createCheckout(client, order.id, new URL(req.url).origin));
+      checkout = await withTransaction((client) =>
+        createCheckout(client, order.id, getAppOrigin(req)),
+      );
     }
   } catch (err) {
     if (!(err instanceof ApiError)) console.error("[orders] payment link", err);

@@ -2,6 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import type { z, ZodType } from "zod";
 import { canUseEndpoint } from "../access";
+import { processWebhookOutbox } from "../app-webhooks";
 import { processEmailOutbox } from "../email/outbox";
 import { ApiError, handler, parseBody, requireUser } from "../http";
 import { PLATFORM_HEADER, resolveScope, type Scope } from "../scope";
@@ -59,6 +60,7 @@ export function route<Id extends EndpointId>(
         throw new ApiError(405, "METHOD_NOT_ALLOWED");
       if (req.method !== "GET") {
         after(() => processEmailOutbox().catch((err) => console.error("[email] outbox", err)));
+        after(() => processWebhookOutbox().catch((err) => console.error("[app webhooks] outbox", err)));
       }
 
       let user: UserRow | null = null;

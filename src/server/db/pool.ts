@@ -1,4 +1,5 @@
 import "server-only";
+import { attachDatabasePool } from "@vercel/functions";
 import pg from "pg";
 import { getConfig } from "../config";
 
@@ -21,6 +22,10 @@ export function getPool() {
   pool.on("error", (err) =>
     console.error("[db] idle client error:", err.message),
   );
+  // On Vercel an idle instance is paused with its connections still open, and many instances
+  // soon use up the database's connection limit ("too many clients"). This keeps the instance
+  // awake until idle connections are closed. Elsewhere it does nothing.
+  attachDatabasePool(pool);
   globalForDb.pgPool = pool;
   return pool;
 }

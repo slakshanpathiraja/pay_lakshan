@@ -4,6 +4,7 @@ import { currencyDigits } from "@/lib/commerce";
 import { ORDER_STATE } from "./commerce";
 import { decryptSecret } from "./crypto";
 import { query } from "./db/pool";
+import { assertPublicHost } from "./net";
 
 // Outgoing app webhooks: each order change queued in webhook_outbox (by a DB trigger) is
 // POSTed as JSON to the app's webhook URLs. Signed with the app secret so the app can check it
@@ -24,8 +25,6 @@ interface OutboxRow {
   attempts: number;
   created_at: Date;
 }
-
-export type AppWebhookPayload = ReturnType<typeof payload>;
 
 function payload(row: OutboxRow, o: OrderSnapshot) {
   return {
@@ -88,6 +87,9 @@ export function signWebhook(secret: string, timestamp: string, body: string) {
 }
 
 async function deliver(row: OutboxRow, o: OrderSnapshot) {
+  const target = new URL(row.url);
+  if (process.env.NODE_ENV === "production" && target.protocol !== "https:") throw new Error("only https URLs");
+  await assertPublicHost(target.hostname);
   const body = JSON.stringify(payload(row, o));
   const timestamp = String(Math.floor(Date.now() / 1000));
   const res = await fetch(row.url, {

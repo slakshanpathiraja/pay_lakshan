@@ -1,6 +1,6 @@
 import "server-only";
 import { jwtVerify } from "jose";
-import { getConfig } from "./config";
+import { query } from "./db/pool";
 import { ApiError } from "./errors";
 import { googleKeys } from "./google-play";
 
@@ -12,12 +12,14 @@ export interface GoogleAccount {
 }
 
 /**
- * Checks an ID token an app got from "Sign in with Google": signed by Google, for one of
- * GOOGLE_SIGNIN_CLIENT_IDS, not expired, with an email Google has verified.
+ * Checks an ID token an app got from "Sign in with Google": signed by Google, issued for one of
+ * this app's client ids (App config — so a token another app received is refused), not
+ * expired, with an email Google has verified.
  */
-export async function verifyGoogleIdToken(token: string): Promise<GoogleAccount> {
-  const audience = getConfig().GOOGLE_SIGNIN_CLIENT_IDS;
-  if (!audience?.length) throw new ApiError(503, "GOOGLE_SIGNIN_NOT_CONFIGURED");
+export async function verifyGoogleIdToken(token: string, appId: number): Promise<GoogleAccount> {
+  const { rows } = await query<{ ids: string[] }>("SELECT google_client_ids AS ids FROM apps WHERE id = $1", [appId]);
+  const audience = rows[0]?.ids ?? [];
+  if (!audience.length) throw new ApiError(503, "GOOGLE_SIGNIN_NOT_CONFIGURED");
   try {
     const { payload } = await jwtVerify<{ email?: string; email_verified?: boolean; name?: string }>(
       token,

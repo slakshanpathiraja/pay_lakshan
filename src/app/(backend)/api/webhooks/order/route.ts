@@ -1,6 +1,7 @@
 import { route } from "@/server/api/route";
 import { requireApiUser, verifySignedRequest } from "@/server/app-api";
 import { toMinor } from "@/lib/commerce";
+import { query } from "@/server/db/pool";
 import { ApiError, json } from "@/server/http";
 import { createOrder, fromTemplate } from "@/server/orders";
 
@@ -14,6 +15,12 @@ export const POST = route("appApi.order", async ({ req, body }) => {
   const app = await verifySignedRequest(body);
   const user = await requireApiUser(req, app);
   let details;
+  if (!body.template) {
+    // the app secret ships inside apps, so anyone could set their own price: custom orders
+    // only when the app allows them (App config)
+    const { rows } = await query<{ allow: boolean }>("SELECT allow_custom_orders AS allow FROM apps WHERE id = $1", [app.id]);
+    if (!rows[0]?.allow) throw new ApiError(403, "CUSTOM_ORDERS_OFF");
+  }
   if (body.template) {
     details = await fromTemplate(app.id, { code: body.template });
   } else {

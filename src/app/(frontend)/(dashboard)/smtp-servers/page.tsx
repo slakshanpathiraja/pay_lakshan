@@ -107,6 +107,7 @@ function SmtpDialog({
     password: "",
     fromEmail: server?.from_email ?? "",
     fromName: server?.from_name ?? "",
+    replyTo: server?.reply_to ?? "",
     isDefault: server?.is_default ?? false,
     isActive: server?.is_active ?? true,
   });
@@ -123,6 +124,9 @@ function SmtpDialog({
       return setError("validation.portInvalid");
     if (!EMAIL_RE.test(form.fromEmail.trim()))
       return setError("validation.emailInvalid");
+    const replyTo = form.replyTo.trim();
+    if (replyTo && !EMAIL_RE.test(replyTo))
+      return setError("validation.emailInvalid");
     try {
       await save({
         id: server?.id,
@@ -135,6 +139,7 @@ function SmtpDialog({
         password: server && !form.password ? undefined : form.password,
         fromEmail: form.fromEmail.trim(),
         fromName: form.fromName.trim(),
+        replyTo: replyTo || null,
         isDefault: form.isDefault,
         isActive: form.isActive,
       }).unwrap();
@@ -252,6 +257,17 @@ function SmtpDialog({
                 onChange={(e) => set("fromName", e.target.value)}
               />
             </div>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="smtpReplyTo">{t("smtp.replyTo")}</Label>
+            <Input
+              id="smtpReplyTo"
+              type="email"
+              placeholder="info@example.com"
+              value={form.replyTo}
+              onChange={(e) => set("replyTo", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">{t("smtp.replyToHint")}</p>
           </div>
           <ToggleRow
             id="smtpDefault"
@@ -497,9 +513,16 @@ export default function SmtpServersPage() {
                     </div>
                   </TableCell>
                   <TableCell className="hidden text-sm md:table-cell">
-                    {s.from_name
-                      ? `${s.from_name} <${s.from_email}>`
-                      : s.from_email}
+                    <div>
+                      {s.from_name
+                        ? `${s.from_name} <${s.from_email}>`
+                        : s.from_email}
+                    </div>
+                    {s.reply_to && (
+                      <div className="text-xs text-muted-foreground">
+                        {t("smtp.replyTo")}: {s.reply_to}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <StatusSwitch

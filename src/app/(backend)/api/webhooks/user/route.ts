@@ -29,11 +29,11 @@ const COLUMNS = "id, name, email, password_hash, google_sub, is_active";
  */
 export const POST = route("appApi.user", async ({ req, body }) => {
   const app = await verifySignedRequest(body);
-  const google = body.googleIdToken ? await verifyGoogleIdToken(body.googleIdToken) : null;
+  const google = body.googleIdToken ? await verifyGoogleIdToken(body.googleIdToken, app.id) : null;
   const email = google?.email ?? body.email!.trim().toLowerCase();
   if (
-    hitRateLimit(`app-login:${app.id}:${email}`, 10, WINDOW_MS) ||
-    hitRateLimit(`app-login-ip:${clientIp(req)}`, 100, WINDOW_MS)
+    (await hitRateLimit(`app-login:${app.id}:${email}`, 10, WINDOW_MS)) ||
+    (await hitRateLimit(`app-login-ip:${clientIp(req)}`, 100, WINDOW_MS))
   ) {
     throw new ApiError(429, "TOO_MANY_ATTEMPTS");
   }

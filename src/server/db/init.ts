@@ -239,12 +239,23 @@ async function migrate() {
       password_enc  TEXT,
       from_email    VARCHAR(255)  NOT NULL,
       from_name     VARCHAR(100),
+      reply_to      VARCHAR(255),
       is_default    BOOLEAN       NOT NULL DEFAULT FALSE,
       is_active     BOOLEAN       NOT NULL DEFAULT TRUE,
       created_at    TIMESTAMPTZ   NOT NULL DEFAULT now(),
       updated_at    TIMESTAMPTZ   NOT NULL DEFAULT now()
     );
   `);
+  // Customer replies / question emails go to reply_to (falls back to info@ if from_email is a no-reply address)
+  await query(
+    `ALTER TABLE smtp_servers ADD COLUMN IF NOT EXISTS reply_to VARCHAR(255)`,
+  );
+  await query(
+    `UPDATE smtp_servers
+        SET reply_to = regexp_replace(from_email, '^(no-?reply)@', 'info@', 'i')
+      WHERE reply_to IS NULL
+        AND from_email ~* '^(no-?reply)@'`,
+  );
   // SMTP servers belong to a platform. Servers from before that move to the oldest platform.
   await query(
     `ALTER TABLE smtp_servers ADD COLUMN IF NOT EXISTS platform_id UUID REFERENCES platforms(id) ON DELETE CASCADE`,
@@ -319,6 +330,19 @@ async function migrate() {
   await migrateGooglePlay();
   await migrateOrderTemplates();
   await migrateAppWebhookOutbox();
+  // App API orders with the app's own item / price (no template): off unless turned on per app
+  await query(`ALTER TABLE apps ADD COLUMN IF NOT EXISTS allow_custom_orders BOOLEAN NOT NULL DEFAULT FALSE`);
+  // Sign in with Google: the app's OAuth client ids its ID tokens must be issued for (`aud`) —
+  // per app, so a token one app received can't sign in to another
+  await query(`ALTER TABLE apps ADD COLUMN IF NOT EXISTS google_client_ids TEXT[] NOT NULL DEFAULT '{}'`);
+  // sign-in attempt counters (rate-limit.ts), shared by every server instance
+  await query(`
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      key       VARCHAR(200) PRIMARY KEY,
+      count     INT          NOT NULL,
+      reset_at  TIMESTAMPTZ  NOT NULL
+    );
+  `);
   await resetForPlatforms();
 }
 
@@ -404,6 +428,13 @@ async function seedDefaultAdmin() {
       "SELECT COUNT(*) AS count FROM users",
     );
     if (Number(rows[0].count) > 0) return;
+    // a live server must not come up with the well-known admin / admin: whoever signs in first
+    // would own it
+    const password = process.env.DEFAULT_ADMIN_PASSWORD;
+    if (config.NODE_ENV === "production" && (!password || password === "admin" || password.length < 12)) {
+      console.error("[seed] set DEFAULT_ADMIN_PASSWORD (12+ characters) to create the first super admin");
+      return;
+    }
 
     const hash = await bcrypt.hash(config.DEFAULT_ADMIN_PASSWORD, 12);
     await client.query(
@@ -1002,8 +1033,6 @@ async function migrateAppApi() {
     );
   `);
   await query(`CREATE INDEX IF NOT EXISTS app_user_tokens_user_idx ON app_user_tokens (app_user_id)`);
-  // expired ones are no use to anyone
-  await query(`DELETE FROM app_user_tokens WHERE expires_at < now() - interval '7 days'`);
 }
 
 /**
@@ -1081,8 +1110,6 @@ async function migrateAppWebhookOutbox() {
     CREATE TRIGGER orders_app_webhooks AFTER INSERT OR UPDATE OF payment_status, order_status, ends_at ON orders
       FOR EACH ROW EXECUTE FUNCTION webhook_outbox_order()
   `);
-  // delivered ones are kept a month for checking
-  await query(`DELETE FROM webhook_outbox WHERE status = 'sent' AND created_at < now() - interval '30 days'`);
 }
 
 async function migrateEmailOutbox() {
@@ -1186,10 +1213,6 @@ async function migrateEmailOutbox() {
     CREATE TRIGGER devices_email AFTER INSERT OR UPDATE OF app_user_id OR DELETE ON devices
       FOR EACH ROW EXECUTE FUNCTION email_outbox_device()
   `);
-  // sent / skipped ones are kept a month for checking
-  await query(
-    `DELETE FROM email_outbox WHERE status IN ('sent', 'skipped') AND created_at < now() - interval '30 days'`,
-  );
 }
 
 /**
@@ -1385,13 +1408,41 @@ async function patchDirectOrders() {
   });
 }
 
-// Bump when migrate() changes so a hot-reloaded dev server re-runs it.
-const SCHEMA_VERSION = 43;
+// Bump when migrate() or a seed/patch changes: servers then run them once more (a hot-reloaded
+// dev server too) — otherwise they're skipped because the database says it's done.
+const SCHEMA_VERSION = 47;
 
 const globalForInit = globalThis as unknown as {
   dbReady?: Promise<void>;
   dbVersion?: number;
 };
+
+/** Whether the database was already set up by this SCHEMA_VERSION (false when it's new). */
+async function schemaIsCurrent() {
+  try {
+    const { rows } = await query<{ value: string }>("SELECT value FROM app_meta WHERE key = 'schema-version'");
+    return rows[0]?.value === String(SCHEMA_VERSION);
+  } catch {
+    return false; // no app_meta yet: a new database
+  }
+}
+
+/**
+ * Old rows nobody needs (expired refresh tokens and rate-limit counters, delivered emails and
+ * webhooks after a month).
+ * Run by the health check's cron.
+ */
+export async function cleanUpOldRows() {
+  const [, tokens, emails, webhooks] = await Promise.all([
+    query(`DELETE FROM rate_limits WHERE reset_at < now() - interval '1 day'`),
+    query(`DELETE FROM app_user_tokens WHERE expires_at < now() - interval '7 days'`),
+    query(`DELETE FROM email_outbox WHERE status IN ('sent', 'skipped') AND created_at < now() - interval '30 days'`),
+    query(`DELETE FROM webhook_outbox WHERE status = 'sent' AND created_at < now() - interval '30 days'`),
+    // handled Stripe event ids only matter while Stripe may still resend them (3 days)
+    query(`DELETE FROM stripe_events WHERE received_at < now() - interval '90 days'`),
+  ]);
+  return { tokens: tokens.rowCount ?? 0, emails: emails.rowCount ?? 0, webhooks: webhooks.rowCount ?? 0 };
+}
 
 /** Runs schema setup + seed once per process; every API handler awaits this. */
 export function ensureDb() {
@@ -1399,6 +1450,9 @@ export function ensureDb() {
     globalForInit.dbReady = undefined;
   globalForInit.dbVersion = SCHEMA_VERSION;
   globalForInit.dbReady ??= (async () => {
+    // Serverless platforms start new instances often: when the database already has this
+    // schema, one query is all a cold start costs (the full run is ~200 statements)
+    if (await schemaIsCurrent()) return;
     await migrate();
     await seedSuperAdminRole(); // the role first, then the super admin account that uses it
     await seedDefaultAdmin();
@@ -1419,6 +1473,11 @@ export function ensureDb() {
     await patchUserPendingLimitCard();
     await patchOrderTemplateCards();
     await seedSuperAdminRole(); // Super Admin also gets the cards/actions created above
+    await query(
+      `INSERT INTO app_meta (key, value) VALUES ('schema-version', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+      [String(SCHEMA_VERSION)],
+    );
   })().catch((err) => {
     globalForInit.dbReady = undefined; // retry on the next request
     throw err;

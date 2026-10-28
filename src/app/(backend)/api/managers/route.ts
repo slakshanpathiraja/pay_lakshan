@@ -7,6 +7,7 @@ import {
   assertRoleOnPlatform,
   findPublicUser,
   isMember,
+  isSuperAdmin,
   resolveTargetPlatform,
   type PublicUser,
 } from "@/server/users";
@@ -33,7 +34,8 @@ export const GET = route("managers.list", async ({ user }) => {
 /**
  * Adds a manager to a platform (the active one unless `platformId` is given — see
  * resolveTargetPlatform). A new username creates the account with a temporary password;
- * an existing one gets this platform added (one account, a role per platform).
+ * an existing one gets this platform added (one account, a role per platform) — by a super
+ * admin only.
  */
 export const POST = route("managers.create", async ({ user, body }) => {
   const platformId = await resolveTargetPlatform(
@@ -51,8 +53,10 @@ export const POST = route("managers.create", async ({ user, body }) => {
       body.username,
     ]);
     if (existing[0]) {
-      // super admins already reach every platform; members can't be added twice
-      if (existing[0].role_id !== null)
+      // super admins already reach every platform; members can't be added twice. Only a super
+      // admin may add an existing account to a platform — otherwise any platform's admin could
+      // pull someone else's account in and then reset its password
+      if (existing[0].role_id !== null || !isSuperAdmin(user))
         throw new ApiError(409, "USERNAME_TAKEN");
       if (await isMember(existing[0].id, platformId))
         throw new ApiError(409, "ALREADY_MEMBER");

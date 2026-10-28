@@ -4,6 +4,7 @@ import { withTransaction } from "@/server/db/pool";
 import { json } from "@/server/http";
 import { keyFromName } from "@/lib/access";
 import {
+  assertCanEditCards,
   assertValidParent,
   listPermissions,
   permissionConflict,
@@ -18,7 +19,8 @@ export const GET = route("permissions.list", async () =>
   json({ permissions: await listPermissions() }),
 );
 
-export const POST = route("permissions.create", async ({ body }) => {
+export const POST = route("permissions.create", async ({ user, body }) => {
+  assertCanEditCards(user);
   const urls = validateUrls(body.urls);
   try {
     const id = await withTransaction(async (client) => {

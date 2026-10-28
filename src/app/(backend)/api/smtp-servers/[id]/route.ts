@@ -23,8 +23,8 @@ export const PUT = route("smtp.update", async ({ user, params, body }) => {
     await client.query(
       `UPDATE smtp_servers
           SET name = $1, host = $2, port = $3, secure = $4, username = $5, password_enc = $6,
-              from_email = $7, from_name = $8, is_default = $9, is_active = $10, updated_at = now()
-        WHERE id = $11`,
+              from_email = $7, from_name = $8, reply_to = $9, is_default = $10, is_active = $11, updated_at = now()
+        WHERE id = $12`,
       [
         body.name,
         body.host,
@@ -34,6 +34,7 @@ export const PUT = route("smtp.update", async ({ user, params, body }) => {
         passwordEnc,
         body.fromEmail,
         body.fromName,
+        body.replyTo,
         body.isDefault,
         body.isActive,
         params.id,

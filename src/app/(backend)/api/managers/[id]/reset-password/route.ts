@@ -3,18 +3,14 @@ import { route } from "@/server/api/route";
 import { query } from "@/server/db/pool";
 import { json } from "@/server/http";
 import { generateTemporaryPassword } from "@/server/password";
-import {
-  assertMemberOfActivePlatform,
-  assertNotSelf,
-  findPublicUser,
-} from "@/server/users";
+import { assertManagesWholeAccount, assertNotSelf, findPublicUser } from "@/server/users";
 
 /** Sets a temporary password (given or generated); the manager must change it on next login. */
 export const POST = route(
   "managers.resetPassword",
   async ({ user, params, body }) => {
     assertNotSelf(user, params.id);
-    await assertMemberOfActivePlatform(user, params.id);
+    await assertManagesWholeAccount(user, params.id);
     const temporaryPassword = body.password || generateTemporaryPassword();
     await query(
       `UPDATE users

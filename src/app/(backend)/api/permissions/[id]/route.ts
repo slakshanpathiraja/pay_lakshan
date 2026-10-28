@@ -3,6 +3,7 @@ import { route } from "@/server/api/route";
 import { query, withTransaction } from "@/server/db/pool";
 import { ApiError, json } from "@/server/http";
 import {
+  assertCanEditCards,
   assertNotOwnCard,
   assertValidParent,
   listPermissions,
@@ -16,6 +17,7 @@ import {
 export const PUT = route(
   "permissions.update",
   async ({ user, params, body }) => {
+    assertCanEditCards(user);
     await assertNotOwnCard(user, params.id);
     const urls = validateUrls(body.urls);
     try {
@@ -51,6 +53,7 @@ export const PUT = route(
 
 /** Removing a card also removes its grants from every role. */
 export const DELETE = route("permissions.delete", async ({ user, params }) => {
+  assertCanEditCards(user);
   await assertNotOwnCard(user, params.id);
   const { rowCount } = await query("DELETE FROM permissions WHERE id = $1", [
     params.id,

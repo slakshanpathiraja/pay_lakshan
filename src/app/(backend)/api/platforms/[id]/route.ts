@@ -3,12 +3,14 @@ import { route } from "@/server/api/route";
 import { query, withTransaction } from "@/server/db/pool";
 import { ApiError, json } from "@/server/http";
 import { PLATFORM_SELECT, type PlatformRow } from "@/server/platforms";
-import { isMember, isSuperAdmin } from "@/server/users";
+import { isSuperAdmin, resolveTargetPlatform } from "@/server/users";
 
-/** Rename. Non super admins only for platforms they belong to. */
+/**
+ * Rename. Non super admins only for platforms where their role there allows it (checked
+ * against the target platform, not just the active one).
+ */
 export const PUT = route("platforms.update", async ({ user, params, body }) => {
-  if (!isSuperAdmin(user) && !(await isMember(user.id, params.id)))
-    throw new ApiError(404, "NOT_FOUND");
+  await resolveTargetPlatform(user, params.id, "platforms.update");
   try {
     const { rowCount } = await query(
       "UPDATE platforms SET name = $1, updated_at = now() WHERE id = $2",
@@ -30,15 +32,14 @@ export const PUT = route("platforms.update", async ({ user, params, body }) => {
 /**
  * Deletes the platform with its roles and memberships. Accounts that belonged only to this
  * platform are deleted too (an account without a platform can't sign in).
- * Non super admins may delete only platforms they belong to, and not their active one.
+ * Non super admins: only platforms where their role there allows it, and not their active one.
  */
 export const DELETE = route("platforms.delete", async ({ user, params }) => {
   // non super admins: only platforms they belong to, and never the one they're working in
   if (!isSuperAdmin(user)) {
-    if (!(await isMember(user.id, params.id)))
-      throw new ApiError(404, "NOT_FOUND");
     if (params.id === user.platform_id)
       throw new ApiError(400, "ACTIVE_PLATFORM");
+    await resolveTargetPlatform(user, params.id, "platforms.delete");
   }
   await withTransaction(async (client) => {
     const { rows: members } = await client.query<{ user_id: number }>(

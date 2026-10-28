@@ -9,18 +9,6 @@ import { ApiError } from "./errors";
 // STRIPE_WEBHOOK_SECRET) and the webhook (stripe-webhook.ts) finds the order from the
 // session's metadata, updates it and records the payment.
 
-/** Webhook events to choose when adding the endpoint in the Stripe Dashboard. */
-export const STRIPE_EVENTS = [
-  "checkout.session.completed",
-  "checkout.session.async_payment_succeeded",
-  "checkout.session.async_payment_failed",
-  "checkout.session.expired",
-  "invoice.paid",
-  "invoice.payment_failed",
-  "customer.subscription.deleted",
-  "charge.refunded",
-] as const;
-
 const globalForStripe = globalThis as unknown as {
   stripe?: { key: string; client: Stripe };
 };

@@ -97,7 +97,7 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
     params: [
       { name: "email", required: "if", description: "The user's email (not case sensitive). With `password`; not with `googleIdToken`.", example: SAMPLE_EMAIL },
       { name: "password", required: "if", description: "At least 8 characters. With `email`.", example: "Demo@12345", secret: true },
-      { name: "googleIdToken", required: "if", description: "Sign in with Google instead of email + password: the ID token Google gave the app for the account the user picked (`idToken` from Google Sign-In, requested with your OAuth Web client id). The email comes from Google, already verified.", example: "", secret: true },
+      { name: "googleIdToken", required: "if", description: "Sign in with Google instead of email + password: the ID token Google gave the app for the account the user picked (`idToken` from Google Sign-In, requested with the Web client ID set in this app's App config → Sign in with Google). The email comes from Google, already verified.", example: "", secret: true },
     ],
     responses: [
       {
@@ -114,8 +114,8 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
     errors: [
       { status: 401, code: "APP_USER_LOGIN_FAILED", when: "Wrong password for this email, or the email belongs to a different Google account." },
       { status: 401, code: "APP_USER_USE_GOOGLE", when: "Email + password for a user who signs in with Google (they have no password)." },
-      { status: 401, code: "GOOGLE_TOKEN_INVALID", when: "`googleIdToken` isn't a valid, unexpired Google ID token for one of the server's client ids, or its email isn't verified." },
-      { status: 503, code: "GOOGLE_SIGNIN_NOT_CONFIGURED", when: "The server has no `GOOGLE_SIGNIN_CLIENT_IDS`." },
+      { status: 401, code: "GOOGLE_TOKEN_INVALID", when: "`googleIdToken` isn't a valid, unexpired Google ID token issued for one of **this app's** client IDs (App config), or its email isn't verified — a token another app received is refused." },
+      { status: 503, code: "GOOGLE_SIGNIN_NOT_CONFIGURED", when: "This app has no Google client ID in App config (Sign in with Google)." },
       { status: 403, code: "ACCOUNT_DISABLED", when: "The user was turned off in the dashboard." },
       { status: 429, code: "TOO_MANY_ATTEMPTS", when: "More than 10 tries for this email in 15 minutes." },
     ],
@@ -165,7 +165,7 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
     token: true,
     params: [
       { name: "template", required: "if", description: "An order template's code (Order templates page), e.g. \"pro_monthly\" — the item, price and billing come from the server. Send this instead of itemName / amount / currency / billing / interval / quantity (recommended for mobile apps: the price can't be changed by the app).", example: "" },
-      { name: "itemName", required: "if", description: "Custom order (no `template`): what the user buys.", example: "Pro plan" },
+      { name: "itemName", required: "if", description: "Custom order (no `template`, and only when App config allows custom orders): what the user buys.", example: "Pro plan" },
       { name: "amount", required: "if", description: "Custom order: price of one item in the currency's units, e.g. \"9.99\" (no thousands separators).", example: "9.99" },
       { name: "currency", required: "if", description: "Custom order: currency of the amount.", example: "USD", options: ["USD", "EUR", "GBP", "LKR", "INR", "AUD", "CAD", "SGD", "JPY"] },
       { name: "billing", required: "if", description: "Custom order — lifetime: pay once, never expires · fixed_term: pay once, access for the interval · recurring: subscription renewing every interval.", example: "recurring", options: ["lifetime", "fixed_term", "recurring"] },
@@ -196,6 +196,7 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
       { status: 409, code: "PENDING_ORDER_LIMIT", when: "The user already has as many unpaid orders as allowed (default 3)." },
       { status: 400, code: "INVALID_TEMPLATE", when: "The app has no template with this code." },
       { status: 409, code: "TEMPLATE_INACTIVE", when: "The template is turned off." },
+      { status: 403, code: "CUSTOM_ORDERS_OFF", when: "A custom order (no `template`) while the app doesn't allow them — App config → Custom App API orders (off by default)." },
     ],
     notes: [
       "Order from a template (`template`: its code) whenever you can: the price lives on the server, so a modified app can't change it. Custom orders (itemName + amount…) stay possible.",
@@ -223,9 +224,9 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
         example: {
           email: SAMPLE_EMAIL,
           orders: [
-            { orderId: "ORD-261026-K7EGQ7", status: "active", expiresAt: "2026-11-26T10:00:00.000Z" },
-            { orderId: "ORD-261001-AB12CD", status: "expired", expiresAt: "2026-10-01T10:00:00.000Z" },
-            { orderId: "ORD-260901-ZX98YW", status: "active", expiresAt: null },
+            { orderId: "ORD-261026-K7EGQ7", status: "active", expiresAt: "2026-11-26T10:00:00.000Z", template: "pro_monthly" },
+            { orderId: "ORD-261001-AB12CD", status: "expired", expiresAt: "2026-10-01T10:00:00.000Z", template: "pro_monthly" },
+            { orderId: "ORD-260901-ZX98YW", status: "active", expiresAt: null, template: "lifetime" },
           ],
         },
       },
@@ -235,6 +236,7 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
       "GET: the parameters go in the query string and are signed the same way.",
       "`status`: pending (not paid yet), active (give access), expired, cancelled.",
       "`expiresAt` null = never expires (lifetime).",
+      "`template`: the order template's code — which plan was bought (null for a custom order). Check it when your app sells more than one plan.",
       "Give access while there is an active order whose `expiresAt` is null or in the future.",
     ],
   },

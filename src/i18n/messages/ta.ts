@@ -167,10 +167,7 @@ const ta: Messages = {
     subtitle: "உங்கள் கணக்கின் கண்ணோட்டம் இதோ.",
     role: "பங்கு",
     lastLogin: "கடைசி உள்நுழைவு",
-    status: "கணக்கு நிலை",
     active: "செயலில்",
-    totalManagers: "மேலாளர்கள்",
-    activeManagers: "{count} செயலில்",
     manageManagers: "மேலாளர்களை நிர்வகி",
     securityTitle: "பாதுகாப்பு",
     securityText:
@@ -340,6 +337,9 @@ const ta: Messages = {
     passwordKeep: "தற்போதைய கடவுச்சொல்லை வைத்திருக்க காலியாக விடவும்",
     fromEmail: "அனுப்புநர் மின்னஞ்சல்",
     fromName: "அனுப்புநர் பெயர்",
+    replyTo: "பதிலளிக்க வேண்டிய மின்னஞ்சல்",
+    replyToHint:
+      "வாடிக்கையாளர் பதில்கள் மற்றும் கேள்விகள் வர வேண்டிய முகவரி (காலியாக விட்டால் From முகவரி பயன்படும்).",
     default: "இயல்புநிலை சேவையகம்",
     defaultHint:
       "குறிப்பிட்ட சேவையகம் தேர்ந்தெடுக்கப்படாதபோது பயன்படும். ஒன்று மட்டுமே இயல்புநிலையாக இருக்கலாம்.",
@@ -507,6 +507,13 @@ const ta: Messages = {
     redirects: "Redirects",
     redirectsDescription:
       "ஒவ்வொரு கட்டண நிலைக்கும் வாடிக்கையாளர் திருப்பி அனுப்பப்படும் இடம். தேவையில்லை எனில் காலியாக விடவும்.",
+    customOrders: "தனிப்பயன் App API ஆர்டர்கள்",
+    customOrdersDescription:
+      "ஆப்பின் சொந்த பொருள் பெயர் மற்றும் விலையுடன் App API ஆர்டர்களை உருவாக்க அனுமதிக்கவும். முடக்கம்: ஆப்கள் உங்கள் ஆர்டர் வார்ப்புருக்களை மட்டுமே ஆர்டர் செய்ய முடியும் — ஆப் ரகசியம் ஆப்பிற்குள் இருப்பதால் அதன் பயனர்கள் எந்த விலையையும் அமைக்க முடியும் என்பதால் இது பாதுகாப்பானது.",
+    googleClientIds: "Google மூலம் உள்நுழைவு",
+    googleClientIdsDescription:
+      "இந்த ஆப்பின் Google ID டோக்கன்கள் வழங்கப்படும் OAuth client ID-கள் (Google Cloud → Credentials) — பொதுவாக ஆப் டோக்கனைக் கோரும் Web client ID. ஒரு வரிக்கு ஒன்று. காலியாக இருந்தால்: இந்த ஆப்பிற்கு Google உள்நுழைவு முடக்கம்.",
+    googleClientIdInvalid: "\"{id}\" ஒரு client ID அல்ல — அது .apps.googleusercontent.com இல் முடியும்",
     urlInvalid: "https:// உடன் தொடங்கும் முழு URL ஐ உள்ளிடவும்",
     statusSuccess: "வெற்றி",
     statusFailed: "தோல்வி",
@@ -625,7 +632,6 @@ const ta: Messages = {
     createPayLink: "இணைப்பை உருவாக்கு",
     newPayLink: "புதிய இணைப்பு",
     newPayLinkHint: "புதிய இணைப்பு உருவாக்கினால் தற்போதையது வேலை செய்யாது.",
-    copyLink: "நகலெடு",
     linkCopied: "கட்டண இணைப்பு நகலெடுக்கப்பட்டது",
     openLink: "திற",
     payLinkFailed: "இன்னும் கட்டண இணைப்பு இல்லை: {reason}",
@@ -851,7 +857,7 @@ const ta: Messages = {
     TEMPLATE_INACTIVE: "இந்த order template அணைக்கப்பட்டுள்ளது",
     TEMPLATE_CODE_TAKEN: "இந்த app இல் இந்த code உடன் template ஏற்கனவே உள்ளது",
     GOOGLE_PLAY_NOT_CONFIGURED: "சேவையகத்தில் Google Play அமைக்கப்படவில்லை (GOOGLE_PLAY_SERVICE_ACCOUNT / GOOGLE_PLAY_PUSH_AUDIENCE)",
-    GOOGLE_SIGNIN_NOT_CONFIGURED: "சேவையகத்தில் Google உள்நுழைவு அமைக்கப்படவில்லை (GOOGLE_SIGNIN_CLIENT_IDS)",
+    GOOGLE_SIGNIN_NOT_CONFIGURED: "இந்த ஆப்பிற்கு Google உள்நுழைவு முடக்கம் — App config இல் அதன் Google client ID-ஐச் சேர்க்கவும்",
     GOOGLE_TOKEN_INVALID: "Google உள்நுழைவை சரிபார்க்க முடியவில்லை — Google மூலம் மீண்டும் உள்நுழையவும்",
     APP_USER_USE_GOOGLE: "இந்தக் கணக்கு Google மூலம் உள்நுழைகிறது",
     GOOGLE_PLAY_ERROR: "Google Play கோரிக்கையை நிராகரித்தது",
@@ -914,6 +920,8 @@ const ta: Messages = {
     INVALID_PLATFORM: "அந்தத் தளம் இல்லை",
     PLATFORM_NAME_TAKEN: "இந்தப் பெயரில் ஏற்கனவே ஒரு தளம் உள்ளது",
     ALREADY_MEMBER: "இந்தக் கணக்கு ஏற்கனவே இந்தத் தளத்தில் உள்ளது",
+    CUSTOM_ORDERS_OFF: "இந்த ஆப் அதன் ஆர்டர் வார்ப்புருக்களிலிருந்து மட்டுமே ஆர்டர்களை ஏற்கும் — `template` அனுப்பவும்",
+    MANAGER_ON_OTHER_PLATFORMS: "இந்தக் கணக்கு மற்ற தளங்களிலும் உள்ளது — super admin மட்டுமே அதன் கடவுச்சொல்லை மீட்டமைக்கவோ முடக்கவோ முடியும்",
     INVALID_PARENT:
       "அந்த மேல்நிலை அனுமதிக்கப்படவில்லை (அது இல்லை அல்லது சுழற்சியை உருவாக்கும்)",
     PERMISSION_KEY_TAKEN: "இந்த விசையுடன் ஏற்கனவே ஒரு அனுமதி அட்டை உள்ளது",

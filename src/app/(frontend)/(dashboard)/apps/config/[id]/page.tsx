@@ -29,6 +29,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/app/page-header";
 import { useAccess } from "@/hooks/use-access";
 import { useT } from "@/i18n";
@@ -68,6 +70,8 @@ const STATUS_UI: Record<
   },
 };
 
+const GOOGLE_CLIENT_ID = /^[\w-]+\.apps\.googleusercontent\.com$/;
+
 /** "" is fine (nothing set); anything else must be a full http(s) URL. */
 const urlError = (value: string) => !!value.trim() && !isHttpUrl(value.trim());
 
@@ -93,12 +97,18 @@ function ConfigForm({
     },
   );
 
+  const [customOrders, setCustomOrders] = useState(config.customOrders);
+  const [clientIdsText, setClientIdsText] = useState(config.googleClientIds.join("\n"));
+  const clientIds = [...new Set(clientIdsText.split(/[\s,]+/).filter(Boolean))];
+  const badClientId = clientIds.find((id) => !GOOGLE_CLIENT_ID.test(id));
   const trimmedHooks = webhooks.map((w) => w.trim());
   const duplicate = (i: number) =>
     !!trimmedHooks[i] && trimmedHooks.indexOf(trimmedHooks[i]) !== i;
   const invalid =
     webhooks.some((w, i) => urlError(w) || duplicate(i)) ||
-    REDIRECT_STATUSES.some((s) => urlError(redirects[s]));
+    REDIRECT_STATUSES.some((s) => urlError(redirects[s])) ||
+    !!badClientId ||
+    clientIds.length > 10;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,6 +123,8 @@ function ConfigForm({
             url: redirects[status].trim(),
           }),
         ),
+        customOrders,
+        googleClientIds: clientIds,
       }).unwrap();
       toast.success(res.message);
     } catch {
@@ -237,6 +249,48 @@ function ConfigForm({
               </div>
             );
           })}
+        </CardContent>
+      </Card>
+
+      {/* App API orders */}
+      <Card>
+        <CardContent className="flex items-start justify-between gap-4">
+          <div className="grid gap-1">
+            <Label htmlFor="custom-orders">{t("appConfig.customOrders")}</Label>
+            <p className="text-sm text-muted-foreground">
+              {t("appConfig.customOrdersDescription")}
+            </p>
+          </div>
+          <Switch
+            id="custom-orders"
+            checked={customOrders}
+            onCheckedChange={setCustomOrders}
+            disabled={!canEdit}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Sign in with Google */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("appConfig.googleClientIds")}</CardTitle>
+          <CardDescription>{t("appConfig.googleClientIdsDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2">
+          <Textarea
+            aria-label={t("appConfig.googleClientIds")}
+            aria-invalid={!!badClientId}
+            className="min-h-20 font-mono text-xs"
+            placeholder="123456789012-abc123.apps.googleusercontent.com"
+            value={clientIdsText}
+            onChange={(e) => setClientIdsText(e.target.value)}
+            disabled={!canEdit}
+          />
+          {badClientId && (
+            <p className="text-xs text-destructive">
+              {t("appConfig.googleClientIdInvalid", { id: badClientId })}
+            </p>
+          )}
         </CardContent>
       </Card>
 

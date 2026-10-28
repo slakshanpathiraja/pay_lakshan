@@ -44,18 +44,32 @@ function billingText(billing: string, unit: string | null, count: number | null)
   return "One-time, lifetime access";
 }
 
-/** App + platform names and the address users can write to (the platform's SMTP sender). */
+/** App + platform names and the address users can write to (the platform's support / reply-to email). */
 async function context(appId: number) {
-  const { rows } = await query<{ app_name: string; platform_name: string; support_email: string | null }>(
+  const { rows } = await query<{
+    app_name: string;
+    platform_name: string;
+    from_email: string | null;
+    reply_to: string | null;
+  }>(
     `SELECT a.name AS app_name, p.name AS platform_name,
             (SELECT s.from_email FROM smtp_servers s
-              WHERE s.platform_id = p.id AND s.is_active ORDER BY s.is_default DESC, s.id LIMIT 1) AS support_email
+              WHERE s.platform_id = p.id AND s.is_active ORDER BY s.is_default DESC, s.id LIMIT 1) AS from_email,
+            (SELECT s.reply_to FROM smtp_servers s
+              WHERE s.platform_id = p.id AND s.is_active ORDER BY s.is_default DESC, s.id LIMIT 1) AS reply_to
        FROM apps a JOIN platforms p ON p.id = a.platform_id
       WHERE a.id = $1`,
     [appId],
   );
   const c = rows[0];
-  return c ? { appName: c.app_name, platformName: c.platform_name, supportEmail: c.support_email ?? "" } : null;
+  if (!c) return null;
+  const supportEmail =
+    c.reply_to?.trim() ||
+    (c.from_email && /^no-?reply@/i.test(c.from_email)
+      ? c.from_email.replace(/^no-?reply@/i, "info@")
+      : c.from_email) ||
+    "";
+  return { appName: c.app_name, platformName: c.platform_name, supportEmail };
 }
 
 async function userName(appUserId: unknown, fallback: string) {

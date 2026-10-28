@@ -953,9 +953,3 @@ export function normalizePath(path: string) {
   if (p.length > 1) p = p.replace(/\/+$/, "");
   return p;
 }
-
-/** Normalises a typed grant like "patch api/users/:id/status" → "PATCH /api/managers/{id}/status". */
-export function normalizeEndpointGrant(grant: string) {
-  const [method = "", ...rest] = grant.trim().split(/\s+/);
-  return `${method.toUpperCase()} ${normalizePath(rest.join(""))}`;
-}

@@ -61,7 +61,11 @@ export const updateUserRoleSchema = z.object({ roleId });
 // Temporary passwords skip the strength rules: the user must replace them with a
 // strong one on first sign in. Leave empty to have the server generate one.
 export const resetPasswordSchema = z.object({
-  password: z.string().max(128).optional(),
+  password: z
+    .string()
+    .max(128)
+    .optional()
+    .refine((v) => !v || v.length >= 8, "At least 8 characters"),
 });
 
 export const updateStatusSchema = z.object({
@@ -81,6 +85,15 @@ const optionalText = (max: number) =>
     .max(max)
     .optional()
     .transform((v) => v || null);
+
+const optionalEmail = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(255)
+  .optional()
+  .refine((v) => !v || z.email().safeParse(v).success, "Invalid email")
+  .transform((v) => v || null);
 
 const action = z.enum(ACTIONS);
 
@@ -161,6 +174,7 @@ export const smtpServerSchema = z.object({
   password: z.string().max(500).optional(),
   fromEmail: z.string().trim().toLowerCase().max(255).pipe(z.email()),
   fromName: optionalText(100),
+  replyTo: optionalEmail,
   isDefault: z.boolean(),
   isActive: z.boolean(),
 });
@@ -238,6 +252,20 @@ export const appConfigSchema = z.object({
       (list) => new Set(list.map((r) => r.status)).size === list.length,
       "One redirect per status",
     ),
+  /** App API orders may set their own item and price (not only a template); omitted = keep */
+  customOrders: z.boolean().optional(),
+  /** Sign in with Google: the app's OAuth client ids (Web, or Android/iOS); omitted = keep */
+  googleClientIds: z
+    .array(
+      z
+        .string()
+        .trim()
+        .max(200)
+        .regex(/^[\w-]+\.apps\.googleusercontent\.com$/, "A client ID ends with .apps.googleusercontent.com"),
+    )
+    .max(10)
+    .refine((list) => new Set(list).size === list.length, "Each client ID only once")
+    .optional(),
 });
 
 // --- an app's customers and what they buy (scoped: see scope.ts) ---------------------

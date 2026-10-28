@@ -15,7 +15,7 @@ import {
 const DUMMY_HASH = bcrypt.hashSync("dummy-password-for-timing", 12);
 
 export const POST = route("auth.login", async ({ req, body }) => {
-  if (hitRateLimit(`login:${clientIp(req)}`, 20, 15 * 60 * 1000)) {
+  if (await hitRateLimit(`login:${clientIp(req)}`, 20, 15 * 60 * 1000)) {
     throw new ApiError(429, "TOO_MANY_ATTEMPTS");
   }
 

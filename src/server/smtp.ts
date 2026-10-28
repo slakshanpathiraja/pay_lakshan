@@ -16,10 +16,26 @@ export interface SmtpServerRow {
   password_enc: string | null;
   from_email: string;
   from_name: string | null;
+  reply_to: string | null;
   is_default: boolean;
   is_active: boolean;
   created_at: Date;
   updated_at: Date;
+}
+
+/**
+ * Where customer replies and question emails go. Uses `reply_to` when set;
+ * if sending from a `no-reply@...` address, automatically directs replies to `info@...`.
+ */
+export function replyToFor(server: {
+  reply_to?: string | null;
+  from_email: string;
+}): string | undefined {
+  if (server.reply_to?.trim()) return server.reply_to.trim();
+  if (/^no-?reply@/i.test(server.from_email)) {
+    return server.from_email.replace(/^no-?reply@/i, "info@");
+  }
+  return undefined;
 }
 
 /** Never send the password (encrypted or not) to the client. */

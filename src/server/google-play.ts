@@ -165,7 +165,9 @@ export const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com
  */
 export async function verifyPushRequest(req: Request) {
   const { GOOGLE_PLAY_PUSH_AUDIENCE: audience, GOOGLE_PLAY_PUSH_EMAIL: email } = getConfig();
-  if (!audience) throw new ApiError(503, "GOOGLE_PLAY_NOT_CONFIGURED");
+  // both are needed: without the sender, any Google service account could mint a token
+  // with this audience
+  if (!audience || !email) throw new ApiError(503, "GOOGLE_PLAY_NOT_CONFIGURED");
   const token = req.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
   if (!token) throw new ApiError(401, "GOOGLE_PUSH_UNAUTHORIZED");
   try {
@@ -173,7 +175,7 @@ export async function verifyPushRequest(req: Request) {
       issuer: ["https://accounts.google.com", "accounts.google.com"],
       audience,
     });
-    if (email && (payload.email !== email || payload.email_verified !== true)) throw new Error("wrong account");
+    if (payload.email !== email || payload.email_verified !== true) throw new Error("wrong account");
   } catch {
     throw new ApiError(401, "GOOGLE_PUSH_UNAUTHORIZED");
   }

@@ -26,8 +26,8 @@ export const POST = route("smtp.create", async ({ user, body }) => {
     if (body.isDefault) await clearOtherDefaults(client, platformId, null);
     const { rows } = await client.query<{ id: number }>(
       `INSERT INTO smtp_servers
-         (platform_id, name, host, port, secure, username, password_enc, from_email, from_name, is_default, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+         (platform_id, name, host, port, secure, username, password_enc, from_email, from_name, reply_to, is_default, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
       [
         platformId,
         body.name,
@@ -38,6 +38,7 @@ export const POST = route("smtp.create", async ({ user, body }) => {
         body.password ? encryptSecret(body.password) : null,
         body.fromEmail,
         body.fromName,
+        body.replyTo,
         body.isDefault,
         body.isActive,
       ],

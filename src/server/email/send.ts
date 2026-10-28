@@ -1,7 +1,7 @@
 import "server-only";
 import { randomInt } from "node:crypto";
 import { query } from "../db/pool";
-import { transportFor, type SmtpServerRow } from "../smtp";
+import { replyToFor, transportFor, type SmtpServerRow } from "../smtp";
 
 // Emails to an app's users go out through their platform's own SMTP servers (SMTP page).
 
@@ -38,10 +38,12 @@ export async function sendPlatformEmail(platformId: string, message: EmailMessag
   let lastError = "";
   for (const server of shuffle(rows)) {
     const transport = transportFor(server);
+    const replyTo = replyToFor(server);
     try {
       await transport.sendMail({
         from: server.from_name ? { name: server.from_name, address: server.from_email } : server.from_email,
         to: message.to,
+        ...(replyTo ? { replyTo } : {}),
         subject: message.subject,
         html: message.html,
         text: message.text,

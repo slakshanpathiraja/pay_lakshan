@@ -284,6 +284,14 @@ export async function assertNotOwnRole(actor: UserRow, roleId: number) {
     throw new ApiError(400, "CANNOT_MODIFY_OWN_ROLE");
 }
 
+/**
+ * Permission cards are shared by every platform's roles: only a super admin may create,
+ * change or delete them (a platform admin could otherwise widen other platforms' roles).
+ */
+export function assertCanEditCards(actor: UserRow) {
+  if (!isSuperAdmin(actor)) throw new ApiError(403, "FORBIDDEN");
+}
+
 export async function assertNotOwnCard(actor: UserRow, permissionId: number) {
   if (isSuperAdmin(actor)) return;
   const { rowCount } = await query(

@@ -224,6 +224,20 @@ export async function assertMemberOfActivePlatform(
     throw new ApiError(404, "NOT_FOUND");
 }
 
+/**
+ * Password resets and turning an account off reach it on every platform, so a platform's admin
+ * may only do them to accounts that belong to their active platform alone (super admins: any).
+ */
+export async function assertManagesWholeAccount(actor: UserRow, targetId: number) {
+  await assertMemberOfActivePlatform(actor, targetId);
+  if (isSuperAdmin(actor)) return;
+  const { rowCount } = await query(
+    "SELECT 1 FROM user_platforms WHERE user_id = $1 AND platform_id <> $2 LIMIT 1",
+    [targetId, activePlatform(actor)],
+  );
+  if (rowCount) throw new ApiError(403, "MANAGER_ON_OTHER_PLATFORMS");
+}
+
 /** Throws INVALID_ROLE unless the role exists on that platform (the global Super Admin role never does). */
 export async function assertRoleOnPlatform(roleId: number, platformId: string) {
   const { rowCount } = await query(

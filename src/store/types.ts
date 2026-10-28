@@ -124,6 +124,7 @@ export interface SmtpServer {
   has_password: boolean;
   from_email: string;
   from_name: string | null;
+  reply_to: string | null;
   is_default: boolean;
   is_active: boolean;
   created_at: string;
@@ -139,6 +140,7 @@ export interface SmtpServerInput {
   password?: string;
   fromEmail: string;
   fromName?: string;
+  replyTo?: string | null;
   isDefault: boolean;
   isActive: boolean;
 }
@@ -173,6 +175,10 @@ export interface AppConfig {
   app: Pick<AppItem, "id" | "name" | "kind" | "identifier">;
   webhooks: { url: string }[];
   redirects: { status: RedirectStatus; url: string }[];
+  /** App API orders may set their own item and price (otherwise templates only) */
+  customOrders: boolean;
+  /** Sign in with Google: the OAuth client ids this app's ID tokens are issued for */
+  googleClientIds: string[];
 }
 
 // --- an app's customers and what they buy -------------------------------------------

@@ -407,6 +407,8 @@ export const api = createApi({
         id: number;
         webhooks: AppConfig["webhooks"];
         redirects: AppConfig["redirects"];
+        customOrders: boolean;
+        googleClientIds: string[];
       }
     >({
       query: ({ id, ...body }) => ({

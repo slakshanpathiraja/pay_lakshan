@@ -162,10 +162,7 @@ const en = {
     subtitle: "Here is an overview of your account.",
     role: "Role",
     lastLogin: "Last login",
-    status: "Account status",
     active: "Active",
-    totalManagers: "Managers",
-    activeManagers: "{count} active",
     manageManagers: "Manage managers",
     securityTitle: "Security",
     securityText: "Change your password regularly and never share it.",
@@ -328,6 +325,9 @@ const en = {
     passwordKeep: "Leave empty to keep the current password",
     fromEmail: "From email",
     fromName: "From name",
+    replyTo: "Reply-to email",
+    replyToHint:
+      "Where customer replies and question emails go. If empty, uses From email (or info@ when sending from a no-reply address).",
     default: "Default server",
     defaultHint:
       "Used when no specific server is chosen. Only one can be default.",
@@ -491,6 +491,13 @@ const en = {
     redirects: "Redirects",
     redirectsDescription:
       "Where the customer is sent back to for each payment status. Leave empty to skip.",
+    customOrders: "Custom App API orders",
+    customOrdersDescription:
+      "Let the App API create orders with the app's own item name and price. Off: apps can only order your order templates — safer, because the app secret is inside your app and its users could set any price.",
+    googleClientIds: "Sign in with Google",
+    googleClientIdsDescription:
+      "The OAuth client IDs (Google Cloud → Credentials) this app's Google ID tokens are issued for — usually the Web client ID the app requests the token with. One per line. Empty: Google sign-in is off for this app.",
+    googleClientIdInvalid: "\"{id}\" isn't a client ID — it ends with .apps.googleusercontent.com",
     urlInvalid: "Enter a full URL starting with https://",
     statusSuccess: "Success",
     statusFailed: "Failed",
@@ -605,7 +612,6 @@ const en = {
     createPayLink: "Create link",
     newPayLink: "New link",
     newPayLinkHint: "A new link stops the current one working.",
-    copyLink: "Copy",
     linkCopied: "Payment link copied",
     openLink: "Open",
     payLinkFailed: "No payment link yet: {reason}",
@@ -828,7 +834,7 @@ const en = {
     TEMPLATE_INACTIVE: "This order template is turned off",
     TEMPLATE_CODE_TAKEN: "This app already has a template with this code",
     GOOGLE_PLAY_NOT_CONFIGURED: "Google Play isn't set up on the server (GOOGLE_PLAY_SERVICE_ACCOUNT / GOOGLE_PLAY_PUSH_AUDIENCE)",
-    GOOGLE_SIGNIN_NOT_CONFIGURED: "Sign in with Google isn't set up on the server (GOOGLE_SIGNIN_CLIENT_IDS)",
+    GOOGLE_SIGNIN_NOT_CONFIGURED: "Sign in with Google is off for this app — add its Google client ID in App config",
     GOOGLE_TOKEN_INVALID: "The Google sign-in couldn't be verified — sign in with Google again",
     APP_USER_USE_GOOGLE: "This account signs in with Google",
     GOOGLE_PLAY_ERROR: "Google Play refused the request",
@@ -889,6 +895,8 @@ const en = {
     INVALID_PLATFORM: "That platform doesn't exist",
     PLATFORM_NAME_TAKEN: "A platform with this name already exists",
     ALREADY_MEMBER: "This account is already on this platform",
+    CUSTOM_ORDERS_OFF: "This app only takes orders from its order templates — send `template`",
+    MANAGER_ON_OTHER_PLATFORMS: "This account also belongs to other platforms — only a super admin can reset its password or turn it off",
     INVALID_PARENT:
       "That parent isn't allowed (it doesn't exist or would create a loop)",
     PERMISSION_KEY_TAKEN: "A permission card with this key already exists",

@@ -5,12 +5,17 @@ import { ApiError, json } from "@/server/http";
 import { messageFor } from "@/server/messages";
 import { activePlatform } from "@/server/users";
 
-type ConfigApp = Pick<AppRow, "id" | "name" | "kind" | "identifier">;
+type ConfigApp = Pick<AppRow, "id" | "name" | "kind" | "identifier"> & {
+  customOrders: boolean;
+  googleClientIds: string[];
+};
 
 /** The app (of the active platform) with its webhooks and redirects; 404 for other platforms' apps. */
 async function loadConfig(appId: number, platformId: string) {
   const { rows } = await query<ConfigApp>(
-    "SELECT id, name, kind, identifier FROM apps WHERE id = $1 AND platform_id = $2",
+    `SELECT id, name, kind, identifier, allow_custom_orders AS "customOrders",
+            google_client_ids AS "googleClientIds"
+       FROM apps WHERE id = $1 AND platform_id = $2`,
     [appId, platformId],
   );
   if (!rows[0]) throw new ApiError(404, "NOT_FOUND");
@@ -24,20 +29,36 @@ async function loadConfig(appId: number, platformId: string) {
       [appId],
     ),
   ]);
-  return { app: rows[0], webhooks: webhooks.rows, redirects: redirects.rows };
+  const { customOrders, googleClientIds, ...app } = rows[0];
+  return { app, customOrders, googleClientIds, webhooks: webhooks.rows, redirects: redirects.rows };
 }
 
 export const GET = route("apps.config", async ({ user, params }) => {
   return json(await loadConfig(params.id, activePlatform(user)));
 });
 
-/** Replaces the app's webhooks and redirects. */
+/**
+ * Replaces the app's webhooks and redirects; sets whether App API orders may be custom and the
+ * Google client ids its sign-in tokens must be issued for.
+ */
 export const PUT = route(
   "apps.updateConfig",
   async ({ req, user, params, body }) => {
     const platformId = activePlatform(user);
     const { app } = await loadConfig(params.id, platformId);
     await withTransaction(async (client) => {
+      if (body.customOrders !== undefined) {
+        await client.query("UPDATE apps SET allow_custom_orders = $2, updated_at = now() WHERE id = $1", [
+          app.id,
+          body.customOrders,
+        ]);
+      }
+      if (body.googleClientIds !== undefined) {
+        await client.query("UPDATE apps SET google_client_ids = $2, updated_at = now() WHERE id = $1", [
+          app.id,
+          body.googleClientIds,
+        ]);
+      }
       await client.query("DELETE FROM app_webhooks WHERE app_id = $1", [
         app.id,
       ]);

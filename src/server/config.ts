@@ -73,17 +73,6 @@ const schema = z.object({
     .trim()
     .optional()
     .transform((v) => v || undefined),
-  /** Sign in with Google in apps: the OAuth Web client ids apps get ID tokens for (comma separated) */
-  GOOGLE_SIGNIN_CLIENT_IDS: z
-    .string()
-    .trim()
-    .optional()
-    .transform((v) =>
-      v
-        ?.split(",")
-        .map((id) => id.trim())
-        .filter(Boolean),
-    ),
 });
 
 let cached: z.infer<typeof schema> | null = null;

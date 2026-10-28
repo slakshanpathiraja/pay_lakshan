@@ -1,5 +1,4 @@
 import "server-only";
-import type pg from "pg";
 import {
   ACTIONS,
   actionsUpTo,
@@ -14,7 +13,7 @@ import {
   normalizePath,
   type HttpMethod,
 } from "./api/endpoints";
-import { query } from "./db/pool";
+import { query, type DbClient } from "./db/pool";
 import { ApiError } from "./errors";
 import { isSuperAdmin, type UserRow } from "./users";
 
@@ -69,24 +68,22 @@ export interface RoleRow {
 export async function listRoles(where = "", params: unknown[] = []) {
   const { rows } = await query<RoleRow>(
     `SELECT r.*,
-            COALESCE((SELECT json_agg(json_build_object('permission_id', g.permission_id, 'actions', g.actions)
-                                      ORDER BY g.permission_id)
-                        FROM (SELECT permission_id, array_agg(action) AS actions
+            COALESCE((SELECT json_group_array(json_object('permission_id', g.permission_id, 'actions', json(g.actions)))
+                        FROM (SELECT permission_id, json_group_array(action) AS actions
                                 FROM role_permission_actions
                                WHERE role_id = r.id
                                GROUP BY permission_id) g), '[]') AS grants,
             ((SELECT COUNT(*) FROM user_platforms up WHERE up.role_id = r.id)
-              + (SELECT COUNT(*) FROM users u WHERE u.role_id = r.id))::int AS user_count
+              + (SELECT COUNT(*) FROM users u WHERE u.role_id = r.id)) AS user_count
        FROM roles r
        ${where}
       ORDER BY r.is_system DESC, r.key = 'manager', LOWER(r.name)`,
     params,
   );
   for (const role of rows) {
-    role.grants = role.grants.map((g) => ({
-      ...g,
-      actions: sortActions(g.actions),
-    }));
+    role.grants = role.grants
+      .map((g) => ({ ...g, actions: sortActions(g.actions) }))
+      .sort((a, b) => a.permission_id - b.permission_id);
   }
   return rows;
 }
@@ -94,24 +91,26 @@ export async function listRoles(where = "", params: unknown[] = []) {
 export async function listPermissions(where = "", params: unknown[] = []) {
   const { rows } = await query<PermissionRow>(
     `SELECT p.*,
-            COALESCE((SELECT json_agg(json_build_object(
+            COALESCE((SELECT json_group_array(json_object(
                                 'kind', u.kind, 'method', u.method, 'path', u.path,
-                                'actions', (SELECT COALESCE(json_agg(a.action), '[]')
-                                              FROM permission_url_actions a WHERE a.permission_url_id = u.id))
-                              ORDER BY u.kind DESC, u.path, u.method)
+                                'actions', json((SELECT json_group_array(a.action)
+                                                   FROM permission_url_actions a WHERE a.permission_url_id = u.id))))
                         FROM permission_urls u WHERE u.permission_id = p.id), '[]') AS urls,
             (SELECT COUNT(DISTINCT rpa.role_id)
-               FROM role_permission_actions rpa WHERE rpa.permission_id = p.id)::int AS role_count
+               FROM role_permission_actions rpa WHERE rpa.permission_id = p.id) AS role_count
        FROM permissions p
        ${where}
       ORDER BY p.id`,
     params,
   );
   for (const card of rows) {
-    card.urls = card.urls.map((u) => ({
-      ...u,
-      actions: sortActions(u.actions),
-    }));
+    // pages first, then by path and method
+    card.urls = card.urls
+      .map((u) => ({ ...u, actions: sortActions(u.actions) }))
+      .sort(
+        (a, b) =>
+          b.kind.localeCompare(a.kind) || a.path.localeCompare(b.path) || (a.method ?? "").localeCompare(b.method ?? ""),
+      );
     card.actions = sortActions(card.urls.flatMap((u) => u.actions));
   }
   return rows;
@@ -160,12 +159,16 @@ export function validateUrls(urls: UrlInput[]): PermissionUrl[] {
   return [...merged.values()];
 }
 
+/** SQL: a parameter holding [[permissionId, action], …] as rows `t(permission_id, action)`. */
+const PAIRS_OF = (param: string) =>
+  `(SELECT json_extract(value, '$[0]') AS permission_id, json_extract(value, '$[1]') AS action FROM json_each(${param})) AS t`;
+
 /**
  * Replaces a card's URLs and their actions. Role grants for actions the card no longer
  * offers are removed so the matrix never holds dead entries.
  */
 export async function setPermissionUrls(
-  client: pg.PoolClient,
+  client: DbClient,
   permissionId: number,
   urls: PermissionUrl[],
 ) {
@@ -178,16 +181,16 @@ export async function setPermissionUrls(
       [permissionId, u.kind, u.method, u.path],
     );
     await client.query(
-      `INSERT INTO permission_url_actions (permission_url_id, action) SELECT $1, unnest($2::varchar[])`,
+      `INSERT INTO permission_url_actions (permission_url_id, action) SELECT $1, value FROM json_each($2)`,
       [rows[0].id, u.actions],
     );
   }
   await client.query(
-    `DELETE FROM role_permission_actions rpa
-      WHERE rpa.permission_id = $1
+    `DELETE FROM role_permission_actions
+      WHERE role_permission_actions.permission_id = $1
         AND NOT EXISTS (SELECT 1 FROM permission_urls u
                           JOIN permission_url_actions a ON a.permission_url_id = u.id
-                         WHERE u.permission_id = $1 AND a.action = rpa.action)`,
+                         WHERE u.permission_id = $1 AND a.action = role_permission_actions.action)`,
     [permissionId],
   );
 }
@@ -199,7 +202,7 @@ export async function setPermissionUrls(
  * (e.g. "edit" → view + create + edit).
  */
 export async function setRoleGrants(
-  client: pg.PoolClient,
+  client: DbClient,
   roleId: number,
   grants: { permissionId: number; actions: Action[] }[],
 ) {
@@ -210,7 +213,7 @@ export async function setRoleGrants(
   }>(
     `SELECT DISTINCT u.permission_id, a.action
        FROM permission_urls u JOIN permission_url_actions a ON a.permission_url_id = u.id
-      WHERE u.permission_id = ANY($1::int[])`,
+      WHERE u.permission_id IN (SELECT value FROM json_each($1))`,
     [ids],
   );
   const offered = new Set(rows.map((r) => `${r.permission_id}:${r.action}`));
@@ -235,16 +238,16 @@ export async function setRoleGrants(
   if (pairs.length) {
     await client.query(
       `INSERT INTO role_permission_actions (role_id, permission_id, action)
-       SELECT $1, permission_id, action FROM unnest($2::int[], $3::varchar[]) AS t(permission_id, action)
+       SELECT $1, t.permission_id, t.action FROM ${PAIRS_OF("$2")} WHERE true
        ON CONFLICT DO NOTHING`,
-      [roleId, pairs.map((p) => p[0]), pairs.map((p) => p[1])],
+      [roleId, pairs],
     );
   }
 }
 
 /** Super Admin holds every action of every card (called after cards change). */
 export async function syncSuperAdminGrants(
-  client: Pick<pg.PoolClient, "query">,
+  client: Pick<DbClient, "query">,
 ) {
   await client.query(
     `INSERT INTO role_permission_actions (role_id, permission_id, action)
@@ -262,12 +265,12 @@ export async function syncSuperAdminGrants(
  * the built-in roles have fixed names, Super Admin is fully locked.
  */
 export async function findRoleForUpdate(
-  client: pg.PoolClient,
+  client: DbClient,
   id: number,
   platformId: string | null,
 ) {
   const { rows } = await client.query<{ key: string | null; name: string }>(
-    "SELECT key, name FROM roles WHERE id = $1 AND (platform_id = $2 OR key = 'super_admin') FOR UPDATE",
+    "SELECT key, name FROM roles WHERE id = $1 AND (platform_id = $2 OR key = 'super_admin')",
     [id, platformId],
   );
   if (!rows[0]) throw new ApiError(404, "NOT_FOUND");
@@ -310,12 +313,12 @@ export function uniqueViolation(err: unknown) {
  * the card being edited).
  */
 export async function uniquePermissionKey(
-  client: Pick<pg.PoolClient, "query">,
+  client: Pick<DbClient, "query">,
   base: string,
   excludeId?: number,
 ) {
   const { rows } = await client.query<{ key: string }>(
-    "SELECT key FROM permissions WHERE (key = $1 OR key LIKE $1 || '-%') AND id IS DISTINCT FROM $2",
+    "SELECT key FROM permissions WHERE (key = $1 OR key LIKE $1 || '-%') AND id IS NOT $2",
     [base, excludeId ?? null],
   );
   const taken = new Set(rows.map((r) => r.key));
@@ -339,7 +342,7 @@ export function permissionConflict(err: unknown) {
  * itself or one of its descendants (which would create a loop).
  */
 export async function assertValidParent(
-  client: Pick<pg.PoolClient, "query">,
+  client: Pick<DbClient, "query">,
   parentId: number | null | undefined,
   cardId?: number,
 ) {
@@ -378,7 +381,7 @@ export interface GrantChange {
  *    `held` null = super admin (holds everything).
  */
 export async function applyRoleChanges(
-  client: pg.PoolClient,
+  client: DbClient,
   roleId: number,
   changes: { add: GrantChange[]; remove: GrantChange[] },
   held: Set<string> | null,
@@ -397,7 +400,7 @@ export async function applyRoleChanges(
        FROM permission_urls u
        JOIN permission_url_actions a ON a.permission_url_id = u.id
        JOIN permissions p ON p.id = u.permission_id
-      WHERE u.permission_id = ANY($1::int[])`,
+      WHERE u.permission_id IN (SELECT value FROM json_each($1))`,
     [cardIds],
   );
   const offered = (id: number) =>
@@ -415,7 +418,7 @@ export async function applyRoleChanges(
     permission_id: number;
     action: Action;
   }>(
-    "SELECT permission_id, action FROM role_permission_actions WHERE role_id = $1 AND permission_id = ANY($2::int[])",
+    "SELECT permission_id, action FROM role_permission_actions WHERE role_id = $1 AND permission_id IN (SELECT value FROM json_each($2))",
     [roleId, cardIds],
   );
   const current = new Set(
@@ -451,22 +454,18 @@ export async function applyRoleChanges(
     list.map((g) => g.split(":")).map(([id, a]) => [Number(id), a] as const);
   if (removed.length) {
     await client.query(
-      `DELETE FROM role_permission_actions g
-        USING unnest($2::int[], $3::varchar[]) AS t(permission_id, action)
-        WHERE g.role_id = $1 AND g.permission_id = t.permission_id AND g.action = t.action`,
-      [
-        roleId,
-        pairs(removed).map((p) => p[0]),
-        pairs(removed).map((p) => p[1]),
-      ],
+      `DELETE FROM role_permission_actions
+        WHERE role_permission_actions.role_id = $1
+          AND EXISTS (SELECT 1 FROM ${PAIRS_OF("$2")} WHERE role_permission_actions.permission_id = t.permission_id AND role_permission_actions.action = t.action)`,
+      [roleId, pairs(removed)],
     );
   }
   if (added.length) {
     await client.query(
       `INSERT INTO role_permission_actions (role_id, permission_id, action)
-       SELECT $1, permission_id, action FROM unnest($2::int[], $3::varchar[]) AS t(permission_id, action)
+       SELECT $1, t.permission_id, t.action FROM ${PAIRS_OF("$2")} WHERE true
        ON CONFLICT DO NOTHING`,
-      [roleId, pairs(added).map((p) => p[0]), pairs(added).map((p) => p[1])],
+      [roleId, pairs(added)],
     );
   }
 }

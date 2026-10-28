@@ -4,6 +4,7 @@ import { query } from "@/server/db/pool";
 import { json } from "@/server/http";
 import { messageFor } from "@/server/messages";
 import { createOrder, fromTemplate } from "@/server/orders";
+import { pageLimit, paged } from "@/server/paging";
 
 /**
  * Totals are computed from the items (unit price × quantity) — never stored twice; `status`
@@ -16,19 +17,19 @@ export const GET = route("orders.list", async ({ scope, query: q }) => {
               o.billing, o.interval_unit, o.interval_count, o.starts_at, o.ends_at, o.note, o.paid_at, o.created_at,
               ${PAY_URL}, o.stripe_subscription_id, o.google_product_id,
               o.app_id, a.name AS app_name, o.app_user_id, u.name AS user_name, u.email AS user_email,
-              (SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 FROM order_items i WHERE i.order_id = o.id) AS total,
-              (SELECT count(*)::int FROM order_items i WHERE i.order_id = o.id) AS item_count
+              (SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0) FROM order_items i WHERE i.order_id = o.id) AS total,
+              (SELECT count(*) FROM order_items i WHERE i.order_id = o.id) AS item_count
          FROM orders o
          JOIN apps a ON a.id = o.app_id
          JOIN app_users u ON u.id = o.app_user_id
         WHERE o.platform_id = $1
-          AND ($2::int IS NULL OR o.app_id = $2)
-          AND ($3::text IS NULL OR o.payment_status = $3)
-          AND ($5::int IS NULL OR o.app_user_id = $5)
+          AND ($2 IS NULL OR o.app_id = $2)
+          AND ($3 IS NULL OR o.payment_status = $3)
+          AND ($5 IS NULL OR o.app_user_id = $5)
      ) x
-     WHERE ($4::text IS NULL OR x.status = $4)
+     WHERE ($4 IS NULL OR x.status = $4)
      ORDER BY x.created_at DESC
-     LIMIT 500`,
+     ${pageLimit(q.page)}`,
     [
       scope.platformId,
       scope.appId ?? null,
@@ -37,7 +38,8 @@ export const GET = route("orders.list", async ({ scope, query: q }) => {
       q.appUserId ?? null,
     ],
   );
-  return json({ orders: rows });
+  const { items, page, hasMore } = paged(rows, q.page);
+  return json({ orders: items, page, hasMore });
 });
 
 /**

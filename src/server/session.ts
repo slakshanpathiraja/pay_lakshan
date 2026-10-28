@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { jwtVerify, SignJWT } from "jose";
+import { cached } from "./cache";
 import { getConfig } from "./config";
 import { findById, type UserRow } from "./users";
 import {
@@ -60,7 +61,11 @@ export async function getSessionUser() {
   const claims = token ? await verifySessionToken(token) : null;
   if (!claims?.sub) return null;
 
-  const user = await findById(Number(claims.sub), claims.pid ?? null);
+  // cached a minute — dropped (on every instance) after any change, so a sign-out, disabled
+  // account or role change still applies within seconds
+  const user = await cached(`session-user:${claims.sub}:${claims.pid ?? ""}`, 60_000, "data", () =>
+    findById(Number(claims.sub), claims.pid ?? null),
+  );
   // (a user without a usable platform is returned with role_id null; requireUser rejects it)
   if (!user || !user.is_active || user.token_version !== claims.ver)
     return null;

@@ -144,8 +144,8 @@ export async function emailValues(row: OutboxRow): Promise<Record<string, string
     const { rows: items } = await query<{ name: string }>("SELECT name FROM order_items WHERE order_id = $1 ORDER BY id", [o.id]);
     // the payment of this renewal, when the provider reported it
     const { rows: paid } = await query<{ amount: number; currency: string }>(
-      `SELECT amount::float8 AS amount, currency FROM payments
-        WHERE order_id = $1 AND status = 'succeeded' AND created_at >= $2::timestamptz - interval '1 hour'
+      `SELECT amount AS amount, currency FROM payments
+        WHERE order_id = $1 AND status = 'succeeded' AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', $2, '-1 hours')
         ORDER BY created_at DESC LIMIT 1`,
       [o.id, row.created_at],
     );
@@ -180,7 +180,7 @@ export async function emailValues(row: OutboxRow): Promise<Record<string, string
       };
     }
     const { rows: items } = await query<{ name: string; quantity: number; amount: number }>(
-      "SELECT name, quantity, (quantity * unit_amount)::float8 AS amount FROM order_items WHERE order_id = $1 ORDER BY id",
+      "SELECT name, quantity, (quantity * unit_amount) AS amount FROM order_items WHERE order_id = $1 ORDER BY id",
       [o.id],
     );
     const money = (v: number) => formatMoney(v, o.currency, "en");

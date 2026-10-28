@@ -21,11 +21,11 @@ export const GET = route("orders.get", async ({ scope, params }) => {
     quantity: number;
     unit_amount: number;
   }>(
-    "SELECT id, name, quantity, unit_amount::float8 AS unit_amount FROM order_items WHERE order_id = $1 ORDER BY id",
+    "SELECT id, name, quantity, unit_amount AS unit_amount FROM order_items WHERE order_id = $1 ORDER BY id",
     [params.id],
   );
   const { rows: payments } = await query(
-    `SELECT id, kind, status, amount::float8 AS amount, amount_refunded::float8 AS amount_refunded, currency,
+    `SELECT id, kind, status, amount AS amount, amount_refunded AS amount_refunded, currency,
             method_type, method_details, receipt_url, failure_message, livemode, paid_at, created_at
        FROM payments WHERE order_id = $1 ORDER BY created_at DESC`,
     [params.id],

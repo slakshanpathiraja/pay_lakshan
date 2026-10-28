@@ -1,9 +1,8 @@
 import "server-only";
 import type Stripe from "stripe";
-import type pg from "pg";
 import type { PaymentRecordStatus } from "@/lib/commerce";
 import { START_PERIOD, STOP_PERIOD } from "./commerce";
-import { query, withTransaction } from "./db/pool";
+import { query, withTransaction, type DbClient } from "./db/pool";
 
 // What a Stripe webhook event does to orders and payments. Every handler first reads the
 // current objects from Stripe (events can arrive late or out of order, so their payload
@@ -23,7 +22,7 @@ import { query, withTransaction } from "./db/pool";
 //                                                  one-time order is cancelled
 //   checkout.session.expired                       the order's payment link is cleared
 
-type Apply = (client: pg.PoolClient) => Promise<void>;
+type Apply = (client: DbClient) => Promise<void>;
 export type WebhookResult = "handled" | "ignored" | "duplicate";
 
 interface PaymentRecord {
@@ -151,7 +150,7 @@ async function paymentRecord(
 }
 
 async function savePayment(
-  client: pg.PoolClient,
+  client: DbClient,
   order: OrderRef,
   p: PaymentRecord,
 ) {
@@ -159,7 +158,7 @@ async function savePayment(
     `INSERT INTO payments (platform_id, app_id, order_id, reference, kind, invoice_id, status, amount,
                            amount_refunded, currency, method_type, method_details, receipt_url,
                            failure_message, livemode, paid_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, to_timestamp($16))
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, strftime('%Y-%m-%dT%H:%M:%fZ', $16, 'unixepoch'))
      ON CONFLICT (provider, reference) DO UPDATE SET
        status = EXCLUDED.status,
        amount = EXCLUDED.amount,
@@ -194,7 +193,7 @@ async function savePayment(
 
 /** The order (any platform) by our metadata or by its Stripe subscription, locked. */
 async function lockOrder(
-  client: pg.PoolClient,
+  client: DbClient,
   by: {
     order?: { id: number; number: string } | null;
     subscriptionId?: string | null;
@@ -203,8 +202,7 @@ async function lockOrder(
   const { rows } = await client.query<OrderRef>(
     `SELECT id, platform_id, app_id, billing FROM orders
       WHERE (id = $1 AND order_number = $2) OR stripe_subscription_id = $3
-      ORDER BY (id = $1) DESC NULLS LAST LIMIT 1
-      FOR UPDATE`,
+      ORDER BY (id = $1) DESC NULLS LAST LIMIT 1`,
     [by.order?.id ?? null, by.order?.number ?? null, by.subscriptionId ?? null],
   );
   return rows[0] ?? null;
@@ -239,7 +237,7 @@ async function checkoutPayment(
         [order.id],
       );
       await client.query(
-        `UPDATE orders o SET order_status = 'active', ${START_PERIOD}
+        `UPDATE orders AS o SET order_status = 'active', ${START_PERIOD}
           WHERE o.id = $1 AND o.order_status = 'pending' AND o.payment_status = 'paid'`,
         [order.id],
       );
@@ -295,12 +293,13 @@ async function invoiceUpdate(stripe: Stripe, invoiceId: string) {
     );
     if (invoice.status === "paid" && periods.length) {
       await client.query(
-        `UPDATE orders o SET
+        `UPDATE orders AS o SET
                 payment_status = CASE WHEN o.payment_status = 'refunded' THEN o.payment_status ELSE 'paid' END,
                 paid_at = now(),
                 order_status = CASE WHEN o.order_status = 'cancelled' THEN 'cancelled' ELSE 'active' END,
-                starts_at = COALESCE(o.starts_at, to_timestamp($2)),
-                ends_at = GREATEST(o.ends_at, to_timestamp($3)),
+                starts_at = COALESCE(o.starts_at, strftime('%Y-%m-%dT%H:%M:%fZ', $2, 'unixepoch')),
+                ends_at = MAX(COALESCE(o.ends_at, strftime('%Y-%m-%dT%H:%M:%fZ', $3, 'unixepoch')),
+                              strftime('%Y-%m-%dT%H:%M:%fZ', $3, 'unixepoch')),
                 ${CLEAR_LINK}, updated_at = now()
           WHERE o.id = $1`,
         [order.id, start, end],
@@ -377,7 +376,7 @@ async function prepare(
         });
         if (!order) return;
         await client.query(
-          `UPDATE orders o SET order_status = 'cancelled', ${STOP_PERIOD}, ${CLEAR_LINK}, updated_at = now()
+          `UPDATE orders AS o SET order_status = 'cancelled', ${STOP_PERIOD}, ${CLEAR_LINK}, updated_at = now()
             WHERE o.id = $1 AND o.order_status <> 'cancelled'`,
           [order.id],
         );
@@ -404,7 +403,7 @@ async function prepare(
       return async (client) => {
         const { rows: paid } = await client.query<OrderRef>(
           `SELECT o.id, o.platform_id, o.app_id, o.billing FROM payments p JOIN orders o ON o.id = p.order_id
-            WHERE p.reference = $1 FOR UPDATE OF o`,
+            WHERE p.reference = $1`,
           [piId],
         );
         const order = paid[0];
@@ -413,7 +412,7 @@ async function prepare(
         // a subscription keeps running in Stripe: only its payment shows the refund
         if (record.status === "refunded" && order.billing !== "recurring") {
           await client.query(
-            `UPDATE orders o SET payment_status = 'refunded', order_status = 'cancelled', ${STOP_PERIOD},
+            `UPDATE orders AS o SET payment_status = 'refunded', order_status = 'cancelled', ${STOP_PERIOD},
                     updated_at = now()
               WHERE o.id = $1 AND o.payment_status = 'paid'`,
             [order.id],

@@ -70,7 +70,7 @@ interface OrderSnapshot {
 async function snapshot(orderId: number) {
   const { rows } = await query<OrderSnapshot>(
     `SELECT o.order_number, ${ORDER_STATE} AS status, o.payment_status, o.billing, o.currency,
-            COALESCE((SELECT SUM(i.quantity * i.unit_amount) FROM order_items i WHERE i.order_id = o.id), 0)::float8 AS amount,
+            COALESCE((SELECT SUM(i.quantity * i.unit_amount) FROM order_items i WHERE i.order_id = o.id), 0) AS amount,
             t.code AS template_code, o.starts_at, o.ends_at, o.app_user_id, u.email, a.app_secret
        FROM orders o
        JOIN apps a ON a.id = o.app_id
@@ -120,10 +120,10 @@ export async function processWebhookOutbox(limit = 20) {
   // claimed rows are hidden for 10 minutes, so a crash mid-send is retried after that
   const { rows } = await query<OutboxRow>(
     `UPDATE webhook_outbox SET status = 'sending', attempts = attempts + 1,
-            next_attempt_at = now() + interval '10 minutes'
+            next_attempt_at = now('+10 minutes')
       WHERE id IN (SELECT id FROM webhook_outbox
                     WHERE status IN ('pending', 'sending') AND next_attempt_at <= now()
-                    ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED)
+                    ORDER BY id LIMIT $1)
       RETURNING id, app_id, url, event, order_id, data, attempts, created_at`,
     [limit],
   );
@@ -143,8 +143,8 @@ export async function processWebhookOutbox(limit = 20) {
       const error = ((err as Error).name === "TimeoutError" ? "no answer in 10 s" : (err as Error).message).slice(0, 500);
       const giveUp = row.attempts >= MAX_ATTEMPTS;
       await query(
-        `UPDATE webhook_outbox SET status = $2::varchar, last_error = $3, response_status = $4,
-                next_attempt_at = CASE WHEN $2::varchar = 'pending' THEN now() + make_interval(mins => $5) ELSE next_attempt_at END
+        `UPDATE webhook_outbox SET status = $2, last_error = $3, response_status = $4,
+                next_attempt_at = CASE WHEN $2 = 'pending' THEN now('+' || $5 || ' minutes') ELSE next_attempt_at END
           WHERE id = $1`,
         [row.id, giveUp ? "failed" : "pending", error, status, 2 ** row.attempts],
       );

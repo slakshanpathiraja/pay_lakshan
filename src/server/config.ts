@@ -5,18 +5,10 @@ const schema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-  DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  DB_POOL_MAX: z.coerce.number().int().positive().default(10),
-  DB_IDLE_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(30_000),
-  DB_CONNECTION_TIMEOUT_MS: z.coerce
-    .number()
-    .int()
-    .nonnegative()
-    .default(5_000),
-  DB_SSL: z
-    .string()
-    .optional()
-    .transform((v) => v === "true" || v === "1"),
+  /** Turso database: libsql://<db>-<org>.turso.io (or file:local.db for a local SQLite file) */
+  TURSO_DATABASE_URL: z.string().min(1, "TURSO_DATABASE_URL is required"),
+  /** Turso auth token (not needed for a local file) */
+  TURSO_AUTH_TOKEN: z.string().optional(),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   /** Public base URL/host of the app (e.g. https://pay4.lakshan.dev) used for Stripe redirects and checkout */
   APP_URL: z.string().trim().optional(),

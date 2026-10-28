@@ -1,11 +1,10 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
-import type pg from "pg";
-import { query } from "./db/pool";
+import { query, type DbClient } from "./db/pool";
 import { ApiError, type ErrorCode } from "./errors";
 
 /**
- * Turns Postgres constraint errors into API errors: unique violations (23505) by index /
+ * Turns database constraint errors into API errors: unique violations (23505) by index /
  * constraint name, foreign key violations (23503) into `foreignKey`. Rethrows anything else.
  */
 export function mapDbError(
@@ -34,8 +33,13 @@ export function newOrderNumber(now = new Date()) {
   return `ORD-${date}-${random}`;
 }
 
-/** SQL: order `o`'s period as an interval, e.g. '3 month'. */
-export const ORDER_INTERVAL = `(o.interval_count || ' ' || o.interval_unit)::interval`;
+/**
+ * SQL: `from` moved forward by order `o`'s period, as ISO time text — e.g. 31 Jan + 1 month
+ * = 28 Feb ('floor' keeps it in the shorter month, like Postgres did); a week is 7 days.
+ */
+export const afterPeriod = (from: string) =>
+  `strftime('%Y-%m-%dT%H:%M:%fZ', ${from}, CASE o.interval_unit WHEN 'week' THEN '+' || (o.interval_count * 7) || ' days'
+     ELSE '+' || o.interval_count || ' ' || o.interval_unit || 's' END, 'floor')`;
 
 /** SQL: order `o`'s status as shown — an active order past its end date is expired. */
 export const ORDER_STATE = `CASE WHEN o.order_status = 'active' AND o.ends_at IS NOT NULL AND o.ends_at <= now()
@@ -43,7 +47,7 @@ export const ORDER_STATE = `CASE WHEN o.order_status = 'active' AND o.ends_at IS
 
 /** SQL: start a new access period from now (lifetime: no end). */
 export const START_PERIOD = `starts_at = now(),
-  ends_at = CASE WHEN o.billing = 'lifetime' THEN NULL ELSE now() + ${ORDER_INTERVAL} END`;
+  ends_at = CASE WHEN o.billing = 'lifetime' THEN NULL ELSE ${afterPeriod("now()")} END`;
 
 /** SQL: end a running access period now (keeps an end that already passed). */
 export const STOP_PERIOD = `ends_at = CASE WHEN o.starts_at IS NOT NULL AND (o.ends_at IS NULL OR o.ends_at > now())
@@ -74,8 +78,12 @@ export const APP_USER_COLUMNS = `u.id, u.platform_id, u.app_id, u.name, u.email,
 
 /** SQL: an order template (`t`) as the API returns it. */
 export const TEMPLATE_COLUMNS = `t.id, t.platform_id, t.app_id, t.code, t.name, t.currency,
-  t.unit_amount::float8 AS unit_amount, t.billing, t.interval_unit, t.interval_count, t.google_product_id,
+  t.unit_amount AS unit_amount, t.billing, t.interval_unit, t.interval_count, t.google_product_id,
   t.is_active, t.created_at, t.updated_at`;
+
+/** The same columns for RETURNING, where SQLite allows no table alias. */
+export const APP_USER_RETURNING = APP_USER_COLUMNS.replaceAll("u.", "");
+export const TEMPLATE_RETURNING = TEMPLATE_COLUMNS.replaceAll("t.", "");
 /** Unique indexes of order_templates → error codes. */
 export const TEMPLATE_UNIQUE = {
   order_templates_app_id_code_key: "TEMPLATE_CODE_TAKEN",
@@ -91,18 +99,18 @@ export const USER_UNIQUE = {
  * can't take the last slot at once; `exceptDeviceId` is the device being saved.
  */
 export async function assertDeviceSlot(
-  client: pg.PoolClient,
+  client: DbClient,
   appUserId: number,
   exceptDeviceId: number | null,
 ) {
   const { rows } = await client.query<{ max_devices: number }>(
-    "SELECT max_devices FROM app_users WHERE id = $1 FOR UPDATE",
+    "SELECT max_devices FROM app_users WHERE id = $1",
     [appUserId],
   );
   if (!rows[0]) return; // not a user of this app: the foreign key reports it
   const { rows: used } = await client.query<{ n: number }>(
-    `SELECT count(*)::int AS n FROM devices
-      WHERE app_user_id = $1 AND is_active AND ($2::int IS NULL OR id <> $2)`,
+    `SELECT count(*) AS n FROM devices
+      WHERE app_user_id = $1 AND is_active AND ($2 IS NULL OR id <> $2)`,
     [appUserId, exceptDeviceId],
   );
   if (used[0].n >= rows[0].max_devices)

@@ -37,6 +37,7 @@ import {
 } from "@/lib/commerce";
 import { formatDateTime } from "@/lib/format";
 import { usePaymentsQuery } from "@/store/api";
+import { Pager, usePage } from "@/components/app/pager";
 
 const ALL = "all";
 
@@ -48,10 +49,12 @@ export default function PaymentsPage() {
   const [status, setStatus] = useState<PaymentRecordStatus | undefined>();
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
-  const { data: payments, isLoading } = usePaymentsQuery(
-    { appId: scope.appId, status, search: deferredSearch || undefined },
+  const [page, setPage] = usePage(JSON.stringify([scope.appId, status, deferredSearch]));
+  const { data, isLoading, isFetching } = usePaymentsQuery(
+    { appId: scope.appId, status, search: deferredSearch || undefined, page },
     { skip: !scope.platformId },
   );
+  const payments = data?.items;
   const statusItems = [
     { value: ALL, label: t("payments.allStatuses") },
     ...PAYMENT_RECORD_STATUSES.map((s) => ({
@@ -61,7 +64,7 @@ export default function PaymentsPage() {
   ];
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <PageHeader
         title={t("payments.title")}
         description={t("payments.pageDescription")}
@@ -192,6 +195,7 @@ export default function PaymentsPage() {
           </Table>
         </CardContent>
       </Card>
+      <Pager page={page} hasMore={!!data?.hasMore} onChange={setPage} busy={isFetching} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import type { z, ZodType } from "zod";
 import { canUseEndpoint } from "../access";
+import { bumpVersions, cached } from "../cache";
 import { processWebhookOutbox } from "../app-webhooks";
 import { processEmailOutbox } from "../email/outbox";
 import { ApiError, handler, parseBody, requireUser } from "../http";
@@ -40,6 +41,9 @@ function validationError(error: z.ZodError) {
  * and checked (see scope.ts) — handlers must only touch rows of `scope.platformId`.
  * After a request that may change something (not GET), queued emails are sent — once the
  * response is out, so mail never slows a request down.
+ *
+ * Caching: a successful GET answer is kept a minute per user and URL (see cache.ts); any
+ * successful write bumps the data version, so cached answers everywhere are dropped.
  */
 export function route<Id extends EndpointId>(
   id: Id,
@@ -110,7 +114,40 @@ export function route<Id extends EndpointId>(
         );
       }
 
-      return fn({ req, params, query, body, user, scope } as RouteContext<Id>);
+      const run = () => fn({ req, params, query, body, user, scope } as RouteContext<Id>);
+
+      if (req.method === "GET") {
+        if (NOT_CACHED.has(id)) return run();
+        const url = new URL(req.url);
+        const key = `get:${user?.id ?? "-"}:${req.headers.get(PLATFORM_HEADER) ?? ""}:${url.pathname}${url.search}`;
+        const answer = await cached(
+          key,
+          60_000,
+          "data",
+          async () => {
+            const res = await run();
+            return {
+              status: res.status,
+              body: await res.text(),
+              type: res.headers.get("content-type"),
+              cookie: res.headers.has("set-cookie"),
+            };
+          },
+          // only plain successful answers (nothing that sets a cookie) are kept
+          (a) => a.status === 200 && !a.cookie,
+        );
+        return new Response(answer.body, {
+          status: answer.status,
+          headers: { "content-type": answer.type ?? "application/json" },
+        });
+      }
+
+      const res = await run();
+      if (res.status < 400) await bumpVersions();
+      return res;
     },
   );
 }
+
+/** GETs that must run every time: they change things (the cron) or are signed one-offs. */
+const NOT_CACHED = new Set<EndpointId>(["system.health", "appApi.verify"]);

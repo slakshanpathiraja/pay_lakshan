@@ -19,8 +19,8 @@ export const DELETE = route("managers.delete", async ({ user, params }) => {
       [params.id, activePlatform(user)],
     );
     await client.query(
-      `DELETE FROM users u WHERE u.id = $1 AND u.role_id IS NULL
-          AND NOT EXISTS (SELECT 1 FROM user_platforms up WHERE up.user_id = u.id)`,
+      `DELETE FROM users WHERE users.id = $1 AND users.role_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM user_platforms up WHERE up.user_id = users.id)`,
       [params.id],
     );
   });

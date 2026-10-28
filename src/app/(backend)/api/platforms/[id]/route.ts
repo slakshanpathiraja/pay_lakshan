@@ -52,9 +52,9 @@ export const DELETE = route("platforms.delete", async ({ user, params }) => {
     );
     if (!rowCount) throw new ApiError(404, "NOT_FOUND");
     await client.query(
-      `DELETE FROM users u
-        WHERE u.id = ANY($1::int[]) AND u.role_id IS NULL
-          AND NOT EXISTS (SELECT 1 FROM user_platforms up WHERE up.user_id = u.id)`,
+      `DELETE FROM users
+        WHERE users.id IN (SELECT value FROM json_each($1)) AND users.role_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM user_platforms up WHERE up.user_id = users.id)`,
       [members.map((m) => m.user_id)],
     );
   });

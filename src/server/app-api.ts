@@ -86,7 +86,7 @@ async function newRefreshToken(appUserId: number, appId: number) {
   const token = `rt_${randomBytes(32).toString("base64url")}`;
   const { rows } = await query<{ expires_at: Date }>(
     `INSERT INTO app_user_tokens (app_user_id, app_id, token_hash, expires_at)
-     VALUES ($1, $2, $3, now() + make_interval(days => $4)) RETURNING expires_at`,
+     VALUES ($1, $2, $3, now('+' || $4 || ' days')) RETURNING expires_at`,
     [appUserId, appId, hashToken(token), REFRESH_TOKEN_TTL_DAYS],
   );
   return { refreshToken: token, refreshTokenExpiresAt: rows[0].expires_at.toISOString() };

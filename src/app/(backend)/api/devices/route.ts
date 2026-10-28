@@ -3,6 +3,7 @@ import { assertDeviceSlot, mapDbError } from "@/server/commerce";
 import { query, withTransaction } from "@/server/db/pool";
 import { json } from "@/server/http";
 import { messageFor } from "@/server/messages";
+import { pageLimit, paged } from "@/server/paging";
 
 export const GET = route("devices.list", async ({ scope, query: q }) => {
   const { rows } = await query(
@@ -11,13 +12,14 @@ export const GET = route("devices.list", async ({ scope, query: q }) => {
        JOIN apps a ON a.id = d.app_id
        LEFT JOIN app_users u ON u.id = d.app_user_id
       WHERE d.platform_id = $1
-        AND ($2::int IS NULL OR d.app_id = $2)
-        AND ($3::int IS NULL OR d.app_user_id = $3)
+        AND ($2 IS NULL OR d.app_id = $2)
+        AND ($3 IS NULL OR d.app_user_id = $3)
       ORDER BY d.created_at DESC
-      LIMIT 500`,
+      ${pageLimit(q.page)}`,
     [scope.platformId, scope.appId ?? null, q.appUserId ?? null],
   );
-  return json({ devices: rows });
+  const { items, page, hasMore } = paged(rows, q.page);
+  return json({ devices: items, page, hasMore });
 });
 
 /**

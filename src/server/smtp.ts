@@ -1,8 +1,7 @@
 import "server-only";
 import nodemailer from "nodemailer";
-import type pg from "pg";
 import { decryptSecret } from "./crypto";
-import { query } from "./db/pool";
+import { query, type DbClient } from "./db/pool";
 
 export interface SmtpServerRow {
   id: number;
@@ -54,13 +53,13 @@ export async function findSmtp(id: number, platformId: string) {
 
 /** One default server per platform: clear the flag on the platform's other servers first. */
 export async function clearOtherDefaults(
-  client: pg.PoolClient,
+  client: DbClient,
   platformId: string,
   exceptId: number | null,
 ) {
   await client.query(
     `UPDATE smtp_servers SET is_default = FALSE
-      WHERE is_default AND platform_id = $1 AND ($2::int IS NULL OR id <> $2)`,
+      WHERE is_default AND platform_id = $1 AND ($2 IS NULL OR id <> $2)`,
     [platformId, exceptId],
   );
 }

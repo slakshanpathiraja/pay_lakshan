@@ -289,10 +289,12 @@ export function NewOrderDialog({
   // the app's active templates (order creators may list them); null = a custom order
   const { can } = useAccess();
   const canTemplates = can("orderTemplates.list");
-  const { data: templates } = useOrderTemplatesQuery(
+  // (the first 25 active templates of the app — one page)
+  const { data: templatePage } = useOrderTemplatesQuery(
     { appId, active: "true" },
     { skip: !appId || !canTemplates },
   );
+  const templates = templatePage?.items;
   const [templateId, setTemplateId] = useState<number | null>(null);
   const template = templates?.find((tp) => tp.id === templateId) ?? null;
   // after creating: the order's Stripe payment link (or why there is none)

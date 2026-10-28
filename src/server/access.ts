@@ -5,6 +5,7 @@ import {
   endpointKey,
   type EndpointId,
 } from "./api/endpoints";
+import { cached, markAccessChanged } from "./cache";
 import { query } from "./db/pool";
 import { isSuperAdmin, type UserRow } from "./users";
 
@@ -14,62 +15,44 @@ interface RoleAccess {
   endpoints: Set<string>;
   /** the role's own grants: "permissionId:action" */
   grants: Set<string>;
-  loadedAt: number;
 }
 
-// Role → granted pages/endpoints, cached briefly so access checks don't hit the DB on every
-// request. Cleared immediately when roles or permission cards change. Kept on globalThis
-// because Next.js may load this module separately for each route; one cache per process.
-const TTL_MS = 30_000;
-const globalForAccess = globalThis as unknown as {
-  roleAccessCache?: Map<number, RoleAccess>;
-};
-const cache = (globalForAccess.roleAccessCache ??= new Map<
-  number,
-  RoleAccess
->());
+// Role → granted pages/endpoints, cached for a day so access checks don't hit the database on
+// every request — dropped (on every instance) as soon as roles, cards, platforms or managers
+// change (see cache.ts).
+const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Roles / cards / platforms / managers changed: cached access is dropped after this request. */
 export function invalidateAccessCache() {
-  cache.clear();
+  markAccessChanged();
 }
 
-async function loadRoleAccess(roleId: number): Promise<RoleAccess> {
-  const hit = cache.get(roleId);
-  if (hit && Date.now() - hit.loadedAt < TTL_MS) return hit;
-
-  // URLs whose card the role holds an action on, where that action is one the URL is used for.
-  const { rows } = await query<{
-    kind: "page" | "api";
-    method: string | null;
-    path: string;
-  }>(
-    `SELECT DISTINCT u.kind, u.method, u.path
-       FROM role_permission_actions g
-       JOIN roles r ON r.id = g.role_id AND r.is_active -- an inactive role grants nothing
-       JOIN permission_urls u ON u.permission_id = g.permission_id
-       JOIN permission_url_actions a ON a.permission_url_id = u.id AND a.action = g.action
-      WHERE g.role_id = $1`,
-    [roleId],
-  );
-  const { rows: grants } = await query<{
-    permission_id: number;
-    action: Action;
-  }>(
-    `SELECT g.permission_id, g.action
-       FROM role_permission_actions g JOIN roles r ON r.id = g.role_id AND r.is_active
-      WHERE g.role_id = $1`,
-    [roleId],
-  );
-  const access: RoleAccess = {
-    pages: new Set(rows.filter((r) => r.kind === "page").map((r) => r.path)),
-    endpoints: new Set(
-      rows.filter((r) => r.kind === "api").map((r) => `${r.method} ${r.path}`),
-    ),
-    grants: new Set(grants.map((g) => `${g.permission_id}:${g.action}`)),
-    loadedAt: Date.now(),
-  };
-  cache.set(roleId, access);
-  return access;
+function loadRoleAccess(roleId: number): Promise<RoleAccess> {
+  return cached(`role-access:${roleId}`, DAY_MS, "access", async () => {
+    // URLs whose card the role holds an action on, where that action is one the URL is used for.
+    const [{ rows }, { rows: grants }] = await Promise.all([
+      query<{ kind: "page" | "api"; method: string | null; path: string }>(
+        `SELECT DISTINCT u.kind, u.method, u.path
+           FROM role_permission_actions g
+           JOIN roles r ON r.id = g.role_id AND r.is_active -- an inactive role grants nothing
+           JOIN permission_urls u ON u.permission_id = g.permission_id
+           JOIN permission_url_actions a ON a.permission_url_id = u.id AND a.action = g.action
+          WHERE g.role_id = $1`,
+        [roleId],
+      ),
+      query<{ permission_id: number; action: Action }>(
+        `SELECT g.permission_id, g.action
+           FROM role_permission_actions g JOIN roles r ON r.id = g.role_id AND r.is_active
+          WHERE g.role_id = $1`,
+        [roleId],
+      ),
+    ]);
+    return {
+      pages: new Set(rows.filter((r) => r.kind === "page").map((r) => r.path)),
+      endpoints: new Set(rows.filter((r) => r.kind === "api").map((r) => `${r.method} ${r.path}`)),
+      grants: new Set(grants.map((g) => `${g.permission_id}:${g.action}`)),
+    };
+  });
 }
 
 /** For the UI: granted page paths, endpoint ids, and the card × action grants held. */

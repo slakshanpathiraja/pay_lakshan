@@ -41,8 +41,8 @@ export const POST = route("appApi.user", async ({ req, body }) => {
   // a Google account is found by its id first (its email may have changed since)
   const { rows } = await query<AppUserRow>(
     `SELECT ${COLUMNS} FROM app_users
-      WHERE app_id = $1 AND (LOWER(email) = $2 OR ($3::varchar IS NOT NULL AND google_sub = $3))
-      ORDER BY (google_sub IS NOT DISTINCT FROM $3) DESC
+      WHERE app_id = $1 AND (LOWER(email) = $2 OR ($3 IS NOT NULL AND google_sub = $3))
+      ORDER BY (google_sub IS $3) DESC
       LIMIT 1`,
     [app.id, email, google?.sub ?? null],
   );

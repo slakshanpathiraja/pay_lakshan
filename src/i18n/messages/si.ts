@@ -27,6 +27,9 @@ const si: Messages = {
     loggedOut: "ඔබ සාර්ථකව ඉවත් විය",
     toggleTheme: "තේමාව මාරු කරන්න",
     never: "කිසිදා නැත",
+    previousPage: "පෙර",
+    nextPage: "ඊළඟ",
+    pageNumber: "පිටුව {page}",
   },
   menu: {
     docs: "ලේඛන",

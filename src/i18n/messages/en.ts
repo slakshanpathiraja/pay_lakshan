@@ -25,6 +25,9 @@ const en = {
     loggedOut: "You have been logged out",
     toggleTheme: "Toggle theme",
     never: "Never",
+    previousPage: "Previous",
+    nextPage: "Next",
+    pageNumber: "Page {page}",
   },
   menu: {
     docs: "Docs",

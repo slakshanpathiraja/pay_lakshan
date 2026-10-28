@@ -11,36 +11,7 @@ import type {
   PaymentRecordStatus,
   PaymentStatus,
 } from "@/lib/commerce";
-import type {
-  AccessInfo,
-  AppConfig,
-  AppCredentials,
-  AppItem,
-  AppUser,
-  Action,
-  DashboardStats,
-  Device,
-  Order,
-  OrderTemplate,
-  OrderTemplateInput,
-  PayLink,
-  Payment,
-  OrderDetail,
-  OrderInput,
-  ScopeArgs,
-  ApiErrorBody,
-  Me,
-  PermissionCard,
-  PermissionCatalog,
-  PermissionUrl,
-  Platform,
-  PlatformOption,
-  RoleItem,
-  RoleOption,
-  SmtpServer,
-  SmtpServerInput,
-  User,
-} from "./types";
+import type { AccessInfo, AppConfig, AppCredentials, AppItem, AppUser, Action, DashboardStats, Device, Order, OrderTemplate, OrderTemplateInput, PayLink, Payment, OrderDetail, OrderInput, ScopeArgs, ApiErrorBody, Me, PermissionCard, PermissionCatalog, PermissionUrl, Platform, PlatformOption, RoleItem, RoleOption, SmtpServer, SmtpServerInput, User, PageArgs, PageInfo, Paged } from "./types";
 
 /**
  * The platform this tab shows (from /auth/me). Sent with every request so the API can
@@ -97,6 +68,10 @@ type GrantChange = { permissionId: number; actions: Action[] };
 export const api = createApi({
   reducerPath: "api",
   baseQuery,
+  // a screen opened again within a minute shows what was already loaded (no new request);
+  // saving something refetches what it changed (tags)
+  keepUnusedDataFor: 60,
+  refetchOnMountOrArgChange: false,
   tagTypes: [
     "Me",
     "Users",
@@ -426,9 +401,9 @@ export const api = createApi({
     }),
 
     // --- an app's users (customers) ---
-    appUsers: build.query<AppUser[], ScopeArgs & { search?: string }>({
+    appUsers: build.query<Paged<AppUser>, ScopeArgs & PageArgs & { search?: string }>({
       query: (args) => ({ url: "/users", params: clean(args) }),
-      transformResponse: (res: { users: AppUser[] }) => res.users,
+      transformResponse: (res: { users: AppUser[] } & PageInfo) => ({ items: res.users, page: res.page, hasMore: res.hasMore }),
       providesTags: ["AppUsers"],
     }),
     saveAppUser: build.mutation<
@@ -482,9 +457,9 @@ export const api = createApi({
     }),
 
     // --- devices ---
-    devices: build.query<Device[], ScopeArgs & { appUserId?: number }>({
+    devices: build.query<Paged<Device>, ScopeArgs & PageArgs & { appUserId?: number }>({
       query: (args) => ({ url: "/devices", params: clean(args) }),
-      transformResponse: (res: { devices: Device[] }) => res.devices,
+      transformResponse: (res: { devices: Device[] } & PageInfo) => ({ items: res.devices, page: res.page, hasMore: res.hasMore }),
       providesTags: ["Devices"],
     }),
     saveDevice: build.mutation<
@@ -519,15 +494,16 @@ export const api = createApi({
 
     // --- orders ---
     orders: build.query<
-      Order[],
-      ScopeArgs & {
+      Paged<Order>,
+      ScopeArgs &
+        PageArgs & {
         appUserId?: number;
         payment?: PaymentStatus;
         status?: OrderStatus;
       }
     >({
       query: (args) => ({ url: "/orders", params: clean(args) }),
-      transformResponse: (res: { orders: Order[] }) => res.orders,
+      transformResponse: (res: { orders: Order[] } & PageInfo) => ({ items: res.orders, page: res.page, hasMore: res.hasMore }),
       providesTags: ["Orders"],
     }),
     order: build.query<OrderDetail, { id: number }>({
@@ -535,9 +511,13 @@ export const api = createApi({
       transformResponse: (res: { order: OrderDetail }) => res.order,
       providesTags: ["Orders"],
     }),
-    orderTemplates: build.query<OrderTemplate[], ScopeArgs & { active?: "true" | "false" }>({
+    orderTemplates: build.query<Paged<OrderTemplate>, ScopeArgs & PageArgs & { active?: "true" | "false" }>({
       query: (args) => ({ url: "/order-templates", params: clean(args) }),
-      transformResponse: (res: { templates: OrderTemplate[] }) => res.templates,
+      transformResponse: (res: { templates: OrderTemplate[] } & PageInfo) => ({
+        items: res.templates,
+        page: res.page,
+        hasMore: res.hasMore,
+      }),
       providesTags: ["OrderTemplates"],
     }),
     saveOrderTemplate: build.mutation<Msg, OrderTemplateInput & ScopeArgs & { id?: number }>({
@@ -601,15 +581,16 @@ export const api = createApi({
 
     // --- payments (Stripe) ---
     payments: build.query<
-      Payment[],
-      ScopeArgs & {
+      Paged<Payment>,
+      ScopeArgs &
+        PageArgs & {
         orderId?: number;
         status?: PaymentRecordStatus;
         search?: string;
       }
     >({
       query: (args) => ({ url: "/payments", params: clean(args) }),
-      transformResponse: (res: { payments: Payment[] }) => res.payments,
+      transformResponse: (res: { payments: Payment[] } & PageInfo) => ({ items: res.payments, page: res.page, hasMore: res.hasMore }),
       providesTags: ["Payments", "Orders"],
     }),
 

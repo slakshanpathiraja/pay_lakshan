@@ -35,7 +35,7 @@ export const PATCH = route(
         `SELECT ${ORDER_STATE} AS state, o.payment_status, o.paid_at, o.order_number, o.platform_id,
               o.checkout_session_id, o.stripe_subscription_id, o.app_id, o.billing,
               o.google_purchase_token, o.google_product_id
-         FROM orders o WHERE o.id = $1 AND o.platform_id = $2 FOR UPDATE`,
+         FROM orders o WHERE o.id = $1 AND o.platform_id = $2`,
         [params.id, scope.platformId],
       );
       const order = rows[0];
@@ -57,7 +57,7 @@ export const PATCH = route(
         );
       }
       await client.query(
-        `UPDATE orders o SET order_status = $2::varchar, updated_at = now(),
+        `UPDATE orders AS o SET order_status = $2, updated_at = now(),
               ${body.status === "active" ? START_PERIOD : STOP_PERIOD}
         WHERE o.id = $1`,
         [params.id, body.status],

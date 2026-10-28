@@ -42,6 +42,7 @@ import {
   useSetOrderTemplateStatusMutation,
 } from "@/store/api";
 import type { OrderTemplate } from "@/store/types";
+import { Pager, usePage } from "@/components/app/pager";
 
 const CODE_RE = /^[a-z0-9][a-z0-9._-]{0,59}$/;
 /** "Pro plan (monthly)" → "pro_plan_monthly" */
@@ -200,7 +201,12 @@ export default function OrderTemplatesPage() {
   const { locale } = useLocale();
   const { can } = useAccess();
   const scope = useScope();
-  const { data: templates, isLoading } = useOrderTemplatesQuery({ appId: scope.appId }, { skip: !scope.platformId });
+  const [page, setPage] = usePage(String(scope.appId ?? ""));
+  const { data, isLoading, isFetching } = useOrderTemplatesQuery(
+    { appId: scope.appId, page },
+    { skip: !scope.platformId },
+  );
+  const templates = data?.items;
   const [remove, { isLoading: deleting }] = useDeleteOrderTemplateMutation();
   const [setStatus] = useSetOrderTemplateStatusMutation();
   const [editing, setEditing] = useState<OrderTemplate | null | undefined>(undefined);
@@ -221,7 +227,7 @@ export default function OrderTemplatesPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <PageHeader title={t("templates.title")} description={t("templates.pageDescription")}>
         {can("orderTemplates.create") && (
           <Button onClick={() => setEditing(null)}>
@@ -322,6 +328,7 @@ export default function OrderTemplatesPage() {
           </Table>
         </CardContent>
       </Card>
+      <Pager page={page} hasMore={!!data?.hasMore} onChange={setPage} busy={isFetching} />
 
       {editing !== undefined && (
         <TemplateDialog

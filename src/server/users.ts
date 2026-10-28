@@ -61,29 +61,35 @@ export async function findById(id: number, platformId?: string | null) {
             COALESCE(gr.name, pr.name) AS role_name,
             p.id AS platform_id,
             p.name AS platform_name
-       FROM users u
+       FROM (
+         SELECT u.*,
+                -- a member: their platform — the requested, else last used, else first one
+                -- (members can't use inactive platforms)
+                -- (SQLite can't use the outer row in a subquery's ORDER BY: "me" is the user again)
+                (SELECT up.platform_id
+                   FROM user_platforms up
+                   JOIN users me ON me.id = up.user_id
+                   JOIN platforms ap ON ap.id = up.platform_id AND ap.is_active
+                  WHERE up.user_id = u.id
+                  ORDER BY up.platform_id = $2 DESC NULLS LAST,
+                           up.platform_id = me.last_platform_id DESC NULLS LAST,
+                           up.created_at
+                  LIMIT 1) AS member_platform_id,
+                -- a super admin may use any platform, picked the same way
+                (SELECT pl.id
+                   FROM platforms pl
+                   LEFT JOIN users me ON me.id = $1
+                  ORDER BY pl.id = $2 DESC NULLS LAST,
+                           pl.id = me.last_platform_id DESC NULLS LAST,
+                           pl.created_at
+                  LIMIT 1) AS any_platform_id
+           FROM users u
+          WHERE u.id = $1
+       ) u
        LEFT JOIN roles gr ON gr.id = u.role_id AND gr.key = 'super_admin'
-       LEFT JOIN LATERAL (
-         SELECT up.platform_id, up.role_id
-           FROM user_platforms up
-           JOIN platforms ap ON ap.id = up.platform_id AND ap.is_active -- members can't use inactive platforms
-          WHERE up.user_id = u.id
-          ORDER BY up.platform_id = $2::uuid DESC NULLS LAST,
-                   up.platform_id = u.last_platform_id DESC NULLS LAST,
-                   up.created_at
-          LIMIT 1
-       ) m ON gr.id IS NULL
+       LEFT JOIN user_platforms m ON gr.id IS NULL AND m.user_id = u.id AND m.platform_id = u.member_platform_id
        LEFT JOIN roles pr ON pr.id = m.role_id
-       LEFT JOIN LATERAL (
-         SELECT pl.id, pl.name
-           FROM platforms pl
-          WHERE (gr.id IS NULL AND pl.id = m.platform_id)
-             OR (gr.id IS NOT NULL)
-          ORDER BY pl.id = $2::uuid DESC NULLS LAST,
-                   pl.id = u.last_platform_id DESC NULLS LAST,
-                   pl.created_at
-          LIMIT 1
-       ) p ON TRUE
+       LEFT JOIN platforms p ON p.id = CASE WHEN gr.id IS NULL THEN u.member_platform_id ELSE u.any_platform_id END
       WHERE u.id = $1`,
     [id, platformId ?? null],
   );

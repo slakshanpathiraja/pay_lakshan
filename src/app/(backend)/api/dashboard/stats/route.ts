@@ -9,25 +9,25 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
   const appId = scope.appId ?? null;
   const range = q.range || "30d";
 
-  // Compute time intervals based on range
-  let intervalSql = "interval '30 days'";
-  let prevIntervalSql = "interval '60 days'";
+  // The period as SQLite date modifiers for now(…)
+  let intervalSql = "'-30 days'";
+  let prevIntervalSql = "'-60 days'";
   if (range === "7d") {
-    intervalSql = "interval '7 days'";
-    prevIntervalSql = "interval '14 days'";
+    intervalSql = "'-7 days'";
+    prevIntervalSql = "'-14 days'";
   } else if (range === "90d") {
-    intervalSql = "interval '90 days'";
-    prevIntervalSql = "interval '180 days'";
+    intervalSql = "'-90 days'";
+    prevIntervalSql = "'-180 days'";
   } else if (range === "1y") {
-    intervalSql = "interval '1 year'";
-    prevIntervalSql = "interval '2 years'";
+    intervalSql = "'-1 years'";
+    prevIntervalSql = "'-2 years'";
   }
 
   const isAll = range === "all";
 
   // The database is a network hop away: the queries run in two parallel rounds — those that
   // don't depend on the currency first, then the ones for the chosen currency.
-  const dateFormat = range === "1y" ? "YYYY-MM" : "YYYY-MM-DD";
+  const dateFormat = range === "1y" ? "%Y-%m" : "%Y-%m-%d";
   const [
     { rows: currRows },
     { rows: currencySummaries },
@@ -42,7 +42,7 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
     { rows: expiringSoon },
   ] = await Promise.all([
     query<{ currency: string }>(
-      `SELECT DISTINCT currency FROM orders WHERE platform_id = $1 AND ($2::int IS NULL OR app_id = $2)`,
+      `SELECT DISTINCT currency FROM orders WHERE platform_id = $1 AND ($2 IS NULL OR app_id = $2)`,
       [platformId, appId],
     ),
     query<{
@@ -51,25 +51,25 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
       orders_count: number;
     }>(
       `SELECT o.currency,
-              COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 AS total,
-              COUNT(DISTINCT o.id)::int AS orders_count
+              COALESCE(SUM(i.quantity * i.unit_amount), 0) AS total,
+              COUNT(DISTINCT o.id) AS orders_count
          FROM orders o
          JOIN order_items i ON i.order_id = o.id
         WHERE o.platform_id = $1
-          AND ($2::int IS NULL OR o.app_id = $2)
+          AND ($2 IS NULL OR o.app_id = $2)
           AND o.payment_status = 'paid'
-          ${isAll ? "" : `AND o.created_at >= (now() - ${intervalSql})`}
+          ${isAll ? "" : `AND o.created_at >= now(${intervalSql})`}
         GROUP BY o.currency
         ORDER BY total DESC`,
       [platformId, appId],
     ),
     query<{ count: number }>(
-      `SELECT count(*)::int AS count
+      `SELECT count(*) AS count
          FROM payments
         WHERE platform_id = $1
-          AND ($2::int IS NULL OR app_id = $2)
+          AND ($2 IS NULL OR app_id = $2)
           AND status = 'failed'
-          ${isAll ? "" : `AND created_at >= (now() - ${intervalSql})`}`,
+          ${isAll ? "" : `AND created_at >= now(${intervalSql})`}`,
       [platformId, appId],
     ),
     query<{
@@ -79,15 +79,15 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
       failed_orders: number;
       refunded_orders: number;
     }>(
-      `SELECT count(*)::int AS total_orders,
-              count(*) FILTER (WHERE payment_status = 'paid')::int AS paid_orders,
-              count(*) FILTER (WHERE payment_status = 'pending')::int AS pending_orders,
-              count(*) FILTER (WHERE payment_status = 'failed')::int AS failed_orders,
-              count(*) FILTER (WHERE payment_status = 'refunded')::int AS refunded_orders
+      `SELECT count(*) AS total_orders,
+              count(*) FILTER (WHERE payment_status = 'paid') AS paid_orders,
+              count(*) FILTER (WHERE payment_status = 'pending') AS pending_orders,
+              count(*) FILTER (WHERE payment_status = 'failed') AS failed_orders,
+              count(*) FILTER (WHERE payment_status = 'refunded') AS refunded_orders
          FROM orders
         WHERE platform_id = $1
-          AND ($2::int IS NULL OR app_id = $2)
-          ${isAll ? "" : `AND created_at >= (now() - ${intervalSql})`}`,
+          AND ($2 IS NULL OR app_id = $2)
+          ${isAll ? "" : `AND created_at >= now(${intervalSql})`}`,
       [platformId, appId],
     ),
     query<{
@@ -96,14 +96,14 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
       expired: number;
       cancelled: number;
     }>(
-      `SELECT count(*) FILTER (WHERE ${ORDER_STATE} = 'active')::int AS active,
-              count(*) FILTER (WHERE ${ORDER_STATE} = 'pending')::int AS pending,
-              count(*) FILTER (WHERE ${ORDER_STATE} = 'expired')::int AS expired,
-              count(*) FILTER (WHERE ${ORDER_STATE} = 'cancelled')::int AS cancelled
+      `SELECT count(*) FILTER (WHERE ${ORDER_STATE} = 'active') AS active,
+              count(*) FILTER (WHERE ${ORDER_STATE} = 'pending') AS pending,
+              count(*) FILTER (WHERE ${ORDER_STATE} = 'expired') AS expired,
+              count(*) FILTER (WHERE ${ORDER_STATE} = 'cancelled') AS cancelled
          FROM orders o
         WHERE o.platform_id = $1
-          AND ($2::int IS NULL OR o.app_id = $2)
-          ${isAll ? "" : `AND o.created_at >= (now() - ${intervalSql})`}`,
+          AND ($2 IS NULL OR o.app_id = $2)
+          ${isAll ? "" : `AND o.created_at >= now(${intervalSql})`}`,
       [platformId, appId],
     ),
     query<{
@@ -111,39 +111,39 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
       fixed_term_active: number;
       lifetime_active: number;
     }>(
-      `SELECT count(*) FILTER (WHERE order_status = 'active' AND billing = 'recurring')::int AS recurring_active,
-              count(*) FILTER (WHERE order_status = 'active' AND billing = 'fixed_term')::int AS fixed_term_active,
-              count(*) FILTER (WHERE order_status = 'active' AND billing = 'lifetime')::int AS lifetime_active
+      `SELECT count(*) FILTER (WHERE order_status = 'active' AND billing = 'recurring') AS recurring_active,
+              count(*) FILTER (WHERE order_status = 'active' AND billing = 'fixed_term') AS fixed_term_active,
+              count(*) FILTER (WHERE order_status = 'active' AND billing = 'lifetime') AS lifetime_active
          FROM orders
         WHERE platform_id = $1
-          AND ($2::int IS NULL OR app_id = $2)`,
+          AND ($2 IS NULL OR app_id = $2)`,
       [platformId, appId],
     ),
     query<{
       total_users: number;
       total_devices: number;
     }>(
-      `SELECT (SELECT count(*)::int FROM app_users u WHERE u.platform_id = $1 AND ($2::int IS NULL OR u.app_id = $2) AND u.is_active) AS total_users,
-              (SELECT count(*)::int FROM devices d WHERE d.platform_id = $1 AND ($2::int IS NULL OR d.app_id = $2) AND d.is_active) AS total_devices`,
+      `SELECT (SELECT count(*) FROM app_users u WHERE u.platform_id = $1 AND ($2 IS NULL OR u.app_id = $2) AND u.is_active) AS total_users,
+              (SELECT count(*) FROM devices d WHERE d.platform_id = $1 AND ($2 IS NULL OR d.app_id = $2) AND d.is_active) AS total_devices`,
       [platformId, appId],
     ),
     query<{
       billing: "lifetime" | "fixed_term" | "recurring";
       count: number;
     }>(
-      `SELECT billing, count(*)::int AS count
+      `SELECT billing, count(*) AS count
          FROM orders
         WHERE platform_id = $1
-          AND ($2::int IS NULL OR app_id = $2)
-          ${isAll ? "" : `AND created_at >= (now() - ${intervalSql})`}
+          AND ($2 IS NULL OR app_id = $2)
+          ${isAll ? "" : `AND created_at >= now(${intervalSql})`}
         GROUP BY billing`,
       [platformId, appId],
     ),
     query<{ os: string; count: number }>(
-      `SELECT os, count(*)::int AS count
+      `SELECT os, count(*) AS count
          FROM devices
         WHERE platform_id = $1
-          AND ($2::int IS NULL OR app_id = $2)
+          AND ($2 IS NULL OR app_id = $2)
         GROUP BY os
         ORDER BY count DESC`,
       [platformId, appId],
@@ -162,12 +162,12 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
     }>(
       `SELECT o.id, o.order_number, o.payment_status, ${ORDER_STATE} AS status, o.currency,
               o.billing, o.created_at, a.name AS app_name, u.name AS user_name,
-              (SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 FROM order_items i WHERE i.order_id = o.id) AS total
+              (SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0) FROM order_items i WHERE i.order_id = o.id) AS total
          FROM orders o
          JOIN apps a ON a.id = o.app_id
          JOIN app_users u ON u.id = o.app_user_id
         WHERE o.platform_id = $1
-          AND ($2::int IS NULL OR o.app_id = $2)
+          AND ($2 IS NULL OR o.app_id = $2)
         ORDER BY o.created_at DESC
         LIMIT 6`,
       [platformId, appId],
@@ -183,16 +183,16 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
       total: number;
     }>(
       `SELECT o.id, o.order_number, o.currency, o.billing, o.ends_at, a.name AS app_name, u.name AS user_name,
-              (SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 FROM order_items i WHERE i.order_id = o.id) AS total
+              (SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0) FROM order_items i WHERE i.order_id = o.id) AS total
          FROM orders o
          JOIN apps a ON a.id = o.app_id
          JOIN app_users u ON u.id = o.app_user_id
         WHERE o.platform_id = $1
-          AND ($2::int IS NULL OR o.app_id = $2)
+          AND ($2 IS NULL OR o.app_id = $2)
           AND o.order_status = 'active'
           AND o.ends_at IS NOT NULL
           AND o.ends_at >= now()
-          AND o.ends_at <= now() + interval '7 days'
+          AND o.ends_at <= now('+7 days')
         ORDER BY o.ends_at ASC
         LIMIT 5`,
       [platformId, appId],
@@ -215,25 +215,25 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
     prevRows,
   ] = await Promise.all([
     query<{ revenue: number; paid_count: number }>(
-      `SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 AS revenue,
-              COUNT(DISTINCT o.id)::int AS paid_count
+      `SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0) AS revenue,
+              COUNT(DISTINCT o.id) AS paid_count
          FROM orders o
          JOIN order_items i ON i.order_id = o.id
         WHERE o.platform_id = $1
-          AND ($2::int IS NULL OR o.app_id = $2)
+          AND ($2 IS NULL OR o.app_id = $2)
           AND o.payment_status = 'paid'
           AND o.currency = $3
-          ${isAll ? "" : `AND o.created_at >= (now() - ${intervalSql})`}`,
+          ${isAll ? "" : `AND o.created_at >= now(${intervalSql})`}`,
       [platformId, appId, currency],
     ),
     query<{ refunded: number }>(
-      `SELECT COALESCE(SUM(amount_refunded), 0)::float8 AS refunded
+      `SELECT COALESCE(SUM(amount_refunded), 0) AS refunded
          FROM payments
         WHERE platform_id = $1
-          AND ($2::int IS NULL OR app_id = $2)
+          AND ($2 IS NULL OR app_id = $2)
           AND currency = $3
           AND status IN ('refunded', 'partially_refunded')
-          ${isAll ? "" : `AND created_at >= (now() - ${intervalSql})`}`,
+          ${isAll ? "" : `AND created_at >= now(${intervalSql})`}`,
       [platformId, appId, currency],
     ),
     query<{
@@ -241,17 +241,17 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
       revenue: number;
       orders: number;
     }>(
-      `SELECT to_char(o.created_at, '${dateFormat}') AS date,
-              COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 AS revenue,
-              COUNT(DISTINCT o.id)::int AS orders
+      `SELECT strftime('${dateFormat}', o.created_at) AS date,
+              COALESCE(SUM(i.quantity * i.unit_amount), 0) AS revenue,
+              COUNT(DISTINCT o.id) AS orders
          FROM orders o
          JOIN order_items i ON i.order_id = o.id
         WHERE o.platform_id = $1
-          AND ($2::int IS NULL OR o.app_id = $2)
+          AND ($2 IS NULL OR o.app_id = $2)
           AND o.currency = $3
           AND o.payment_status = 'paid'
-          ${isAll ? "" : `AND o.created_at >= (now() - ${intervalSql})`}
-        GROUP BY to_char(o.created_at, '${dateFormat}')
+          ${isAll ? "" : `AND o.created_at >= now(${intervalSql})`}
+        GROUP BY strftime('${dateFormat}', o.created_at)
         ORDER BY date ASC`,
       [platformId, appId, currency],
     ),
@@ -260,13 +260,13 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
       count: number;
       total: number;
     }>(
-      `SELECT provider, count(*)::int AS count,
-              COALESCE(SUM(amount), 0)::float8 AS total
+      `SELECT provider, count(*) AS count,
+              COALESCE(SUM(amount), 0) AS total
          FROM payments
         WHERE platform_id = $1
-          AND ($2::int IS NULL OR app_id = $2)
-          AND ($3::text IS NULL OR currency = $3)
-          ${isAll ? "" : `AND created_at >= (now() - ${intervalSql})`}
+          AND ($2 IS NULL OR app_id = $2)
+          AND ($3 IS NULL OR currency = $3)
+          ${isAll ? "" : `AND created_at >= now(${intervalSql})`}
         GROUP BY provider`,
       [platformId, appId, currency],
     ),
@@ -277,10 +277,10 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
       revenue: number;
     }>(
       `SELECT a.id, a.name,
-              count(DISTINCT o.id)::int AS orders,
-              COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 AS revenue
+              count(DISTINCT o.id) AS orders,
+              COALESCE(SUM(i.quantity * i.unit_amount), 0) AS revenue
          FROM apps a
-         LEFT JOIN orders o ON o.app_id = a.id AND o.payment_status = 'paid' AND o.currency = $2 ${isAll ? "" : `AND o.created_at >= (now() - ${intervalSql})`}
+         LEFT JOIN orders o ON o.app_id = a.id AND o.payment_status = 'paid' AND o.currency = $2 ${isAll ? "" : `AND o.created_at >= now(${intervalSql})`}
          LEFT JOIN order_items i ON i.order_id = o.id
         WHERE a.platform_id = $1
         GROUP BY a.id, a.name
@@ -291,15 +291,15 @@ export const GET = route("dashboard.stats", async ({ scope, query: q }) => {
     isAll
       ? null
       : query<{ prev_revenue: number }>(
-          `SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 AS prev_revenue
+          `SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0) AS prev_revenue
              FROM orders o
              JOIN order_items i ON i.order_id = o.id
             WHERE o.platform_id = $1
-              AND ($2::int IS NULL OR o.app_id = $2)
+              AND ($2 IS NULL OR o.app_id = $2)
               AND o.payment_status = 'paid'
               AND o.currency = $3
-              AND o.created_at < (now() - ${intervalSql})
-              AND o.created_at >= (now() - ${prevIntervalSql})`,
+              AND o.created_at < now(${intervalSql})
+              AND o.created_at >= now(${prevIntervalSql})`,
           [platformId, appId, currency],
         ).then((r) => r.rows),
   ]);

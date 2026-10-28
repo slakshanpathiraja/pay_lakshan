@@ -2,6 +2,7 @@ import { route } from "@/server/api/route";
 import { query } from "@/server/db/pool";
 import { json } from "@/server/http";
 import { expireOverdueOrders } from "@/server/commerce";
+import { bumpVersions } from "@/server/cache";
 import { cleanUpOldRows } from "@/server/db/init";
 import { processWebhookOutbox } from "@/server/app-webhooks";
 import { processEmailOutbox } from "@/server/email/outbox";
@@ -20,6 +21,7 @@ export const GET = route("system.health", async () => {
     return json({ ok: false, db: "down" }, 503);
   }
   const expiredOrders = await expireOverdueOrders();
+  if (expiredOrders) await bumpVersions(); // lists showing those orders are stale now
   const emails = await processEmailOutbox(100);
   const webhooks = await processWebhookOutbox(100);
   const cleanedUp = await cleanUpOldRows();

@@ -469,3 +469,18 @@ export interface DashboardStats {
   recentOrders: RecentOrderSummary[];
   expiringSoon: ExpiringOrderSummary[];
 }
+
+// --- lists are read a page (25 rows) at a time --------------------------------------------
+
+export interface PageInfo {
+  page: number;
+  /** another page follows */
+  hasMore: boolean;
+}
+export interface Paged<T> extends PageInfo {
+  items: T[];
+}
+export interface PageArgs {
+  /** 1-based; default 1 */
+  page?: number;
+}

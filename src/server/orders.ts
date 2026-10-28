@@ -44,7 +44,7 @@ export async function fromTemplate(appId: number, by: { id?: number; code?: stri
     interval_count: number | null;
     is_active: boolean;
   }>(
-    `SELECT id, name, currency, unit_amount::float8 AS unit_amount, billing, interval_unit, interval_count, is_active
+    `SELECT id, name, currency, unit_amount AS unit_amount, billing, interval_unit, interval_count, is_active
        FROM order_templates WHERE app_id = $1 AND (id = $2 OR code = $3)`,
     [appId, by.id ?? null, by.code?.toLowerCase() ?? null],
   );
@@ -73,12 +73,12 @@ export async function createOrder(input: NewOrder, req: Request) {
   const order = await withTransaction(async (client) => {
     // the user row is locked so two orders can't take the last pending slot at once
     const { rows: users } = await client.query<{ max_pending_orders: number }>(
-      "SELECT max_pending_orders FROM app_users WHERE id = $1 AND app_id = $2 FOR UPDATE",
+      "SELECT max_pending_orders FROM app_users WHERE id = $1 AND app_id = $2",
       [input.appUserId, input.appId],
     );
     if (!users[0]) throw new ApiError(400, "INVALID_USER");
     const { rows: pending } = await client.query<{ n: number }>(
-      "SELECT count(*)::int AS n FROM orders WHERE app_user_id = $1 AND order_status = 'pending'",
+      "SELECT count(*) AS n FROM orders WHERE app_user_id = $1 AND order_status = 'pending'",
       [input.appUserId],
     );
     if (pending[0].n >= users[0].max_pending_orders) {
@@ -114,9 +114,7 @@ export async function createOrder(input: NewOrder, req: Request) {
   let checkoutError: string | null = null;
   try {
     if (input.createCheckout !== false) {
-      checkout = await withTransaction((client) =>
-        createCheckout(client, order.id, getAppOrigin(req)),
-      );
+      checkout = await createCheckout(order.id, getAppOrigin(req));
     }
   } catch (err) {
     if (!(err instanceof ApiError)) console.error("[orders] payment link", err);

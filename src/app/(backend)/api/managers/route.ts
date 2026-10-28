@@ -49,7 +49,7 @@ export const POST = route("managers.create", async ({ user, body }) => {
     const { rows: existing } = await client.query<{
       id: number;
       role_id: number | null;
-    }>("SELECT id, role_id FROM users WHERE username = $1 FOR UPDATE", [
+    }>("SELECT id, role_id FROM users WHERE username = $1", [
       body.username,
     ]);
     if (existing[0]) {

@@ -1,9 +1,8 @@
 import "server-only";
-import type pg from "pg";
 import { currencyDigits } from "@/lib/commerce";
 import type { Billing, IntervalUnit } from "@/lib/commerce";
 import { newOrderNumber, ORDER_STATE, START_PERIOD, STOP_PERIOD } from "./commerce";
-import { query, withTransaction } from "./db/pool";
+import { query, withTransaction, type DbClient } from "./db/pool";
 import { ApiError } from "./errors";
 import type { PlayClient, PlayProduct, PlaySubscription } from "./google-play";
 import { stopStripeBilling } from "./stripe";
@@ -125,10 +124,10 @@ interface PlayOrder {
 }
 
 const ORDER_COLUMNS = `o.id, o.platform_id, o.app_id, o.billing, o.currency, ${ORDER_STATE} AS state, o.payment_status,
-  (SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0)::float8 FROM order_items i WHERE i.order_id = o.id) AS total`;
+  (SELECT COALESCE(SUM(i.quantity * i.unit_amount), 0) FROM order_items i WHERE i.order_id = o.id) AS total`;
 
 /** Records the purchase's payment (renewals each get their own Google order id). */
-async function savePlayPayment(client: pg.PoolClient, order: PlayOrder, s: PlayState) {
+async function savePlayPayment(client: DbClient, order: PlayOrder, s: PlayState) {
   if (!s.googleOrderId || (s.outcome !== "paid" && s.outcome !== "grace")) return;
   // the first payment's order id has no "..N" ending (or ..0)
   const renewal = /\.\.(\d+)$/.exec(s.googleOrderId);
@@ -152,31 +151,32 @@ async function savePlayPayment(client: pg.PoolClient, order: PlayOrder, s: PlayS
 }
 
 /** Moves the order (locked by the caller) to what Google says. */
-async function applyPlayState(client: pg.PoolClient, order: PlayOrder, s: PlayState) {
+async function applyPlayState(client: DbClient, order: PlayOrder, s: PlayState) {
   await savePlayPayment(client, order, s);
   if (order.state === "cancelled" && s.outcome !== "cancelled") return; // cancelled here: stays so
   if (s.kind === "subscription") {
     if (s.outcome === "paid" || s.outcome === "grace") {
       const active = !s.expiresAt || s.expiresAt.getTime() > Date.now();
       await client.query(
-        `UPDATE orders o SET payment_status = $2::varchar, paid_at = COALESCE(o.paid_at, now()),
-                order_status = $3::varchar, starts_at = COALESCE(o.starts_at, $4::timestamptz, now()),
+        `UPDATE orders AS o SET payment_status = $2, paid_at = COALESCE(o.paid_at, now()),
+                order_status = $3, starts_at = COALESCE(o.starts_at, $4, now()),
                 -- never before the start (the constraint), whatever the dates Google sends
-                ends_at = GREATEST($5::timestamptz, COALESCE(o.starts_at, $4::timestamptz, now())),
+                ends_at = MAX(COALESCE($5, o.starts_at, $4, now()), COALESCE(o.starts_at, $4, now())),
                 updated_at = now()
           WHERE o.id = $1`,
         [order.id, s.outcome === "grace" ? "failed" : "paid", active ? "active" : "expired", s.startedAt, s.expiresAt],
       );
     } else if (s.outcome === "ended") {
       await client.query(
-        `UPDATE orders o SET order_status = CASE WHEN o.order_status = 'active' THEN 'expired' ELSE o.order_status END,
-                ends_at = GREATEST(COALESCE($2::timestamptz, LEAST(o.ends_at, now())), o.starts_at), updated_at = now()
+        `UPDATE orders AS o SET order_status = CASE WHEN o.order_status = 'active' THEN 'expired' ELSE o.order_status END,
+                ends_at = MAX(COALESCE($2, MIN(COALESCE(o.ends_at, now()), now())),
+                              COALESCE(o.starts_at, $2, MIN(COALESCE(o.ends_at, now()), now()))), updated_at = now()
           WHERE o.id = $1`,
         [order.id, s.expiresAt],
       );
     } else if (s.outcome === "cancelled") {
       await client.query(
-        `UPDATE orders o SET order_status = 'cancelled', ${STOP_PERIOD},
+        `UPDATE orders AS o SET order_status = 'cancelled', ${STOP_PERIOD},
                 payment_status = CASE WHEN o.payment_status = 'pending' THEN 'failed' ELSE o.payment_status END,
                 updated_at = now()
           WHERE o.id = $1`,
@@ -193,13 +193,13 @@ async function applyPlayState(client: pg.PoolClient, order: PlayOrder, s: PlaySt
       [order.id],
     );
     await client.query(
-      `UPDATE orders o SET order_status = 'active', ${START_PERIOD}
+      `UPDATE orders AS o SET order_status = 'active', ${START_PERIOD}
         WHERE o.id = $1 AND o.order_status = 'pending' AND o.payment_status = 'paid'`,
       [order.id],
     );
   } else if (s.outcome === "cancelled") {
     await client.query(
-      `UPDATE orders o SET order_status = 'cancelled', ${STOP_PERIOD},
+      `UPDATE orders AS o SET order_status = 'cancelled', ${STOP_PERIOD},
               payment_status = CASE WHEN o.payment_status = 'pending' THEN 'failed' ELSE o.payment_status END,
               updated_at = now()
         WHERE o.id = $1`,
@@ -254,7 +254,7 @@ async function attachPurchase(play: PlayClient, pkg: string, order: LinkableOrde
   }
   try {
     await withTransaction(async (client) => {
-      const { rows: locked } = await client.query<PlayOrder>(`SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.id = $1 FOR UPDATE`, [
+      const { rows: locked } = await client.query<PlayOrder>(`SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.id = $1`, [
         order.id,
       ]);
       await client.query(
@@ -384,7 +384,7 @@ async function createOrderFromPurchase(play: PlayClient, pkg: string, appIds: nu
   if (!s.userId || !/^\d+$/.test(s.userId)) return "ignored" as const;
   if (s.outcome === "cancelled" || s.outcome === "ended") return "ignored" as const; // nothing bought
   const { rows: users } = await query<{ id: number; app_id: number; platform_id: string }>(
-    "SELECT id, app_id, platform_id FROM app_users WHERE id = $1 AND app_id = ANY($2)",
+    "SELECT id, app_id, platform_id FROM app_users WHERE id = $1 AND app_id IN (SELECT value FROM json_each($2))",
     [Number(s.userId), appIds],
   );
   const user = users[0];
@@ -419,7 +419,7 @@ async function createOrderFromPurchase(play: PlayClient, pkg: string, appIds: nu
         details.name,
         details.amount,
       ]);
-      const { rows: locked } = await client.query<PlayOrder>(`SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.id = $1 FOR UPDATE`, [
+      const { rows: locked } = await client.query<PlayOrder>(`SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.id = $1`, [
         rows[0].id,
       ]);
       await applyPlayState(client, locked[0], s);
@@ -470,7 +470,7 @@ export async function handlePlayNotification(play: PlayClient, n: DeveloperNotif
   const find = async (token: string) =>
     (
       await query<{ id: number; google_product_id: string }>(
-        "SELECT id, google_product_id FROM orders WHERE google_purchase_token = $1 AND app_id = ANY($2)",
+        "SELECT id, google_product_id FROM orders WHERE google_purchase_token = $1 AND app_id IN (SELECT value FROM json_each($2))",
         [token, appIds],
       )
     ).rows[0];
@@ -485,7 +485,7 @@ export async function handlePlayNotification(play: PlayClient, n: DeveloperNotif
         [v.orderId],
       );
       await client.query(
-        `UPDATE orders o SET payment_status = 'refunded', order_status = 'cancelled', ${STOP_PERIOD}, updated_at = now()
+        `UPDATE orders AS o SET payment_status = 'refunded', order_status = 'cancelled', ${STOP_PERIOD}, updated_at = now()
           WHERE o.id = $1`,
         [order.id],
       );
@@ -515,7 +515,7 @@ export async function handlePlayNotification(play: PlayClient, n: DeveloperNotif
     // the billing flow named an order (made with /order) and its user
     if (!state.userId || !/^\d+$/.test(state.userId)) return "ignored";
     const { rows } = await query<LinkableOrder>(
-      `SELECT ${LINKABLE} FROM orders o WHERE o.order_number = $1 AND o.app_id = ANY($2) AND o.app_user_id = $3`,
+      `SELECT ${LINKABLE} FROM orders o WHERE o.order_number = $1 AND o.app_id IN (SELECT value FROM json_each($2)) AND o.app_user_id = $3`,
       [state.orderNumber, appIds, Number(state.userId)],
     );
     if (!rows[0]) return "ignored";
@@ -532,7 +532,7 @@ export async function handlePlayNotification(play: PlayClient, n: DeveloperNotif
     return "handled";
   }
   await withTransaction(async (client) => {
-    const { rows } = await client.query<PlayOrder>(`SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.id = $1 FOR UPDATE`, [order.id]);
+    const { rows } = await client.query<PlayOrder>(`SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.id = $1`, [order.id]);
     await applyPlayState(client, rows[0], state);
   });
   await acknowledge(play, n.packageName, state, token);

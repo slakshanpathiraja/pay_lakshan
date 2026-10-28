@@ -94,6 +94,7 @@ import {
   useSetAppUserStatusMutation,
 } from "@/store/api";
 import type { AppUser, Device, Order, OrderDetail } from "@/store/types";
+import { Pager, usePage } from "@/components/app/pager";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const limitValid = (v: string, max: number) =>
@@ -421,7 +422,9 @@ function UserDevices({ user }: { user: AppUser }) {
   const t = useT();
   const { locale } = useLocale();
   const { can } = useAccess();
-  const { data: devices, isLoading } = useDevicesQuery({ appUserId: user.id });
+  const [page, setPage] = usePage("");
+  const { data, isLoading, isFetching } = useDevicesQuery({ appUserId: user.id, page });
+  const devices = data?.items;
   const [setStatus] = useSetDeviceStatusMutation();
   const [remove, { isLoading: deleting }] = useDeleteDeviceMutation();
   // undefined = closed, null = new device for this user
@@ -528,6 +531,7 @@ function UserDevices({ user }: { user: AppUser }) {
           ))}
         </ul>
       )}
+      <Pager page={page} hasMore={!!data?.hasMore} onChange={setPage} busy={isFetching} />
       {editing !== undefined && (
         <DeviceDialog
           key={editing?.id ?? "new"}
@@ -558,7 +562,9 @@ function UserOrders({ user }: { user: AppUser }) {
   const t = useT();
   const { locale } = useLocale();
   const { can } = useAccess();
-  const { data: orders, isLoading } = useOrdersQuery({ appUserId: user.id });
+  const [page, setPage] = usePage("");
+  const { data, isLoading, isFetching } = useOrdersQuery({ appUserId: user.id, page });
+  const orders = data?.items;
   const [remove, { isLoading: deleting }] = useDeleteOrderMutation();
   const { canChangeStatus, renewable, runRenew, hasPayLink } =
     useOrderActions();
@@ -681,6 +687,7 @@ function UserOrders({ user }: { user: AppUser }) {
           ))}
         </ul>
       )}
+      <Pager page={page} hasMore={!!data?.hasMore} onChange={setPage} busy={isFetching} />
       {creating && (
         <NewOrderDialog
           defaults={{
@@ -742,10 +749,12 @@ export default function AppUsersPage() {
   const { can } = useAccess();
   const scope = useScope();
   const [search, setSearch] = useState("");
-  const { data: users, isLoading } = useAppUsersQuery(
-    { appId: scope.appId, search: search.trim() || undefined },
+  const [page, setPage] = usePage(JSON.stringify([scope.appId, search.trim()]));
+  const { data, isLoading, isFetching } = useAppUsersQuery(
+    { appId: scope.appId, search: search.trim() || undefined, page },
     { skip: !scope.platformId },
   );
+  const users = data?.items;
   const [remove, { isLoading: deleting }] = useDeleteAppUserMutation();
   const [editing, setEditing] = useState<AppUser | null | undefined>(undefined);
   const [toDelete, setToDelete] = useState<AppUser | null>(null);
@@ -782,7 +791,7 @@ export default function AppUsersPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <PageHeader
         title={t("appUsers.title")}
         description={t("appUsers.pageDescription")}
@@ -996,6 +1005,7 @@ export default function AppUsersPage() {
           </Table>
         </CardContent>
       </Card>
+      <Pager page={page} hasMore={!!data?.hasMore} onChange={setPage} busy={isFetching} />
 
       {editing !== undefined && (
         <UserDialog

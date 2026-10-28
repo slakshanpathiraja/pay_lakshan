@@ -23,7 +23,7 @@ export const PATCH = route(
         checkout_session_id: string | null;
       }>(
         `SELECT payment_status, order_status, order_number, platform_id, checkout_session_id
-         FROM orders WHERE id = $1 AND platform_id = $2 FOR UPDATE`,
+         FROM orders WHERE id = $1 AND platform_id = $2`,
         [params.id, scope.platformId],
       );
       const order = rows[0];
@@ -48,20 +48,20 @@ export const PATCH = route(
         );
         if (order.order_status === "pending") {
           await client.query(
-            `UPDATE orders o SET order_status = 'active', ${START_PERIOD} WHERE o.id = $1`,
+            `UPDATE orders AS o SET order_status = 'active', ${START_PERIOD} WHERE o.id = $1`,
             [params.id],
           );
         }
       } else if (body.status === "refunded") {
         await client.query(
-          `UPDATE orders o SET payment_status = 'refunded', order_status = 'cancelled', ${STOP_PERIOD},
+          `UPDATE orders AS o SET payment_status = 'refunded', order_status = 'cancelled', ${STOP_PERIOD},
                 updated_at = now()
           WHERE o.id = $1`,
           [params.id],
         );
       } else {
         await client.query(
-          "UPDATE orders SET payment_status = $1::varchar, updated_at = now() WHERE id = $2",
+          "UPDATE orders SET payment_status = $1, updated_at = now() WHERE id = $2",
           [body.status, params.id],
         );
       }

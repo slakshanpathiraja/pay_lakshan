@@ -21,14 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CustomerPicker } from "@/components/app/customer-picker";
 import { ScopeFields } from "@/components/app/scope";
 import { useT } from "@/i18n";
 import type { TranslationKey } from "@/i18n/config";
 import { DEVICE_OS, type DeviceOs } from "@/lib/commerce";
-import { useAppUsersQuery, useSaveDeviceMutation } from "@/store/api";
+import { useSaveDeviceMutation } from "@/store/api";
 import type { Device } from "@/store/types";
 
-const NONE = "none";
 export const osLabel = (os: DeviceOs) => `devices.os.${os}` as TranslationKey;
 
 /**
@@ -56,15 +56,6 @@ export function DeviceDialog({
   });
   const set = (patch: Partial<typeof form>) =>
     setForm((f) => ({ ...f, ...patch }));
-  // the owner must be a user of the same app
-  const { data: users = [] } = useAppUsersQuery({ appId }, { skip: !appId });
-  const userItems = [
-    { value: NONE, label: t("devices.noUser") },
-    ...users.map((u) => ({
-      value: String(u.id),
-      label: u.email ? `${u.name} · ${u.email}` : u.name,
-    })),
-  ];
   const osItems = DEVICE_OS.map((os) => ({ value: os, label: t(osLabel(os)) }));
   const valid = !!form.deviceUid.trim() && !!appId;
 
@@ -167,25 +158,26 @@ export function DeviceDialog({
           </div>
           <div className="grid gap-2">
             <Label htmlFor="deviceUser">{t("devices.user")}</Label>
-            <Select
-              items={userItems}
-              value={form.appUserId === null ? NONE : String(form.appUserId)}
-              onValueChange={(v) =>
-                v && set({ appUserId: v === NONE ? null : Number(v) })
-              }
-              disabled={!appId}
-            >
-              <SelectTrigger id="deviceUser" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {userItems.map((i) => (
-                  <SelectItem key={i.value} value={i.value}>
-                    {i.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <CustomerPicker
+                  id="deviceUser"
+                  appId={appId}
+                  value={form.appUserId}
+                  onChange={(userId) => set({ appUserId: userId })}
+                  current={
+                    device?.app_user_id
+                      ? { id: device.app_user_id, name: device.user_name ?? "", email: device.user_email ?? null }
+                      : null
+                  }
+                />
+              </div>
+              {form.appUserId !== null && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => set({ appUserId: null })}>
+                  {t("devices.noUser")}
+                </Button>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

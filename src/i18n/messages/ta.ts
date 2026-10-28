@@ -27,6 +27,9 @@ const ta: Messages = {
     loggedOut: "நீங்கள் வெளியேறிவிட்டீர்கள்",
     toggleTheme: "தீமை மாற்று",
     never: "ஒருபோதும் இல்லை",
+    previousPage: "முந்தைய",
+    nextPage: "அடுத்து",
+    pageNumber: "பக்கம் {page}",
   },
   menu: {
     docs: "ஆவணங்கள்",

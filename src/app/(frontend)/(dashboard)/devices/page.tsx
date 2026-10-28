@@ -36,16 +36,19 @@ import {
   useSetDeviceStatusMutation,
 } from "@/store/api";
 import type { Device } from "@/store/types";
+import { Pager, usePage } from "@/components/app/pager";
 
 export default function DevicesPage() {
   const t = useT();
   const { locale } = useLocale();
   const { can } = useAccess();
   const scope = useScope();
-  const { data: devices, isLoading } = useDevicesQuery(
-    { appId: scope.appId },
+  const [page, setPage] = usePage(String(scope.appId ?? ""));
+  const { data, isLoading, isFetching } = useDevicesQuery(
+    { appId: scope.appId, page },
     { skip: !scope.platformId },
   );
+  const devices = data?.items;
   const [remove, { isLoading: deleting }] = useDeleteDeviceMutation();
   const [editing, setEditing] = useState<Device | null | undefined>(undefined);
   const [toDelete, setToDelete] = useState<Device | null>(null);
@@ -66,7 +69,7 @@ export default function DevicesPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <PageHeader
         title={t("devices.title")}
         description={t("devices.pageDescription")}
@@ -200,6 +203,7 @@ export default function DevicesPage() {
           </Table>
         </CardContent>
       </Card>
+      <Pager page={page} hasMore={!!data?.hasMore} onChange={setPage} busy={isFetching} />
 
       {editing !== undefined && (
         <DeviceDialog

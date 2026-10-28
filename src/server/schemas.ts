@@ -290,9 +290,12 @@ const isEmail = (v: string) => z.email().safeParse(v).success;
 export const scopeQuery = z.object({
   appId: z.coerce.number().int().positive().optional(),
 });
+/** Lists: which page (25 rows each, see paging.ts) */
+const pageQuery = { page: z.coerce.number().int().min(1).max(100_000).default(1) };
 const scopeBody = { appId: id };
 
 export const appUsersQuery = scopeQuery.extend({
+  ...pageQuery,
   search: z.string().trim().max(100).optional(),
 });
 /** `{ country: "LK", number: "077 123 4567" }` → `{ country, e164: "+94771234567" }` (or null). */
@@ -352,6 +355,7 @@ const deviceFields = {
   model: nullableText(120),
 };
 export const devicesQuery = scopeQuery.extend({
+  ...pageQuery,
   appUserId: z.coerce.number().int().positive().optional(),
 });
 export const deviceSchema = z.object({ ...scopeBody, ...deviceFields });
@@ -359,6 +363,7 @@ export const deviceSchema = z.object({ ...scopeBody, ...deviceFields });
 export const deviceUpdateSchema = z.object(deviceFields);
 
 export const ordersQuery = scopeQuery.extend({
+  ...pageQuery,
   appUserId: z.coerce.number().int().positive().optional(),
   payment: z.enum(PAYMENT_STATUSES).optional(),
   status: z.enum(ORDER_STATUSES).optional(),
@@ -432,6 +437,7 @@ export const orderTemplateUpdateSchema = z.discriminatedUnion("billing", [
   z.object({ ...templateFields, billing: z.literal("recurring"), ...period }),
 ]);
 export const orderTemplatesQuery = scopeQuery.extend({
+  ...pageQuery,
   /** "true": only active templates (the order form) */
   active: z.enum(["true", "false"]).optional(),
 });
@@ -444,6 +450,7 @@ export const orderStatusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
 
 /** Payments list: the active platform's, optionally of one app / order / status, or a search. */
 export const paymentsQuery = scopeQuery.extend({
+  ...pageQuery,
   orderId: z.coerce.number().int().positive().optional(),
   status: z.enum(PAYMENT_RECORD_STATUSES).optional(),
   search: z.string().trim().max(100).optional(),

@@ -1,5 +1,5 @@
 import { route } from "@/server/api/route";
-import { ORDER_INTERVAL, ORDER_STATE } from "@/server/commerce";
+import { afterPeriod, ORDER_STATE } from "@/server/commerce";
 import { query } from "@/server/db/pool";
 import { ApiError, json } from "@/server/http";
 import { messageFor } from "@/server/messages";
@@ -34,9 +34,9 @@ export const POST = route("orders.renew", async ({ req, scope, params }) => {
   if (order.state !== "active" && order.state !== "expired")
     throw new ApiError(409, "ORDER_STATUS_INVALID");
   const { rows: renewed } = await query<{ ends_at: string }>(
-    `UPDATE orders o SET order_status = 'active', ends_at = GREATEST(o.ends_at, now()) + ${ORDER_INTERVAL},
+    `UPDATE orders AS o SET order_status = 'active', ends_at = ${afterPeriod("MAX(COALESCE(o.ends_at, now()), now())")},
             updated_at = now()
-      WHERE o.id = $1 RETURNING o.ends_at`,
+      WHERE o.id = $1 RETURNING ends_at`,
     [params.id],
   );
   return json({

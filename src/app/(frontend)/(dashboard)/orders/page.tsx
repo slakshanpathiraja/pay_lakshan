@@ -66,6 +66,7 @@ import {
 import { formatDateTime, intlLocale } from "@/lib/format";
 import { useDeleteOrderMutation, useOrdersQuery } from "@/store/api";
 import type { Order, OrderDetail } from "@/store/types";
+import { Pager, usePage } from "@/components/app/pager";
 
 const ALL = "all";
 
@@ -76,10 +77,12 @@ export default function OrdersPage() {
   const scope = useScope();
   const [payment, setPayment] = useState<PaymentStatus | undefined>();
   const [status, setStatus] = useState<OrderStatus | undefined>();
-  const { data: orders, isLoading } = useOrdersQuery(
-    { appId: scope.appId, payment, status },
+  const [page, setPage] = usePage(JSON.stringify([scope.appId, payment, status]));
+  const { data, isLoading, isFetching } = useOrdersQuery(
+    { appId: scope.appId, payment, status, page },
     { skip: !scope.platformId },
   );
+  const orders = data?.items;
   const [remove, { isLoading: deleting }] = useDeleteOrderMutation();
   const { canChangeStatus, renewable, runRenew, hasPayLink } =
     useOrderActions();
@@ -112,7 +115,7 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6">
+    <div className="grid gap-6">
       <PageHeader
         title={t("orders.title")}
         description={t("orders.pageDescription")}
@@ -315,6 +318,7 @@ export default function OrdersPage() {
           </Table>
         </CardContent>
       </Card>
+      <Pager page={page} hasMore={!!data?.hasMore} onChange={setPage} busy={isFetching} />
 
       {creating && (
         <NewOrderDialog

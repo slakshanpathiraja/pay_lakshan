@@ -9,7 +9,7 @@ src/
     (frontend)/login       Login page
     (frontend)/change-password   Forced password change (temporary password)
     (frontend)/(dashboard)/      Sidebar layout: home, managers, account/password
-  server/                  Server-only code: env config, pg pool, DB init/seed, session, helpers
+  server/                  Server-only code: env config, database (Turso) client, schema/seed, session, helpers
   store/                   Redux store + RTK Query API (src/store/api.ts)
   i18n/                    Translations (en, si, ta) and the useT() hook
   utils/menu.ts            Side navigation items (names, icons, roles)
@@ -19,13 +19,18 @@ src/
 ## Setup
 
 ```bash
-cp .env.example .env.local   # then fill in DATABASE_URL and JWT_SECRET
+cp .env.example .env.local   # then fill in TURSO_DATABASE_URL, TURSO_AUTH_TOKEN and JWT_SECRET
 npm install
 npm run dev
 ```
 
-On first start the app creates the `users` table and, if it is empty, a super admin
-`admin` / `admin`. That account must set a new password on first login.
+The database is [Turso](https://turso.tech) (libSQL / SQLite). On first start the app creates
+the tables (`src/server/db/schema.ts`) and, if there are no accounts, a super admin `admin` /
+`admin` (in production: `DEFAULT_ADMIN_PASSWORD`, 12+ characters). That account must set a new
+password on first login. For local work without Turso, `TURSO_DATABASE_URL=file:local.db`.
+
+Moving from the old Postgres database: set `OLD_DATABASE_URL` and run
+`node_modules/.bin/jiti scripts/copy-postgres-to-turso.mts` (`--replace` to copy again).
 
 ## Roles
 

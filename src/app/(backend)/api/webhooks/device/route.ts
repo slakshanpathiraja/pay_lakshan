@@ -15,7 +15,7 @@ export const POST = route("appApi.device", async ({ req, body }) => {
   try {
     const { device, created } = await withTransaction(async (client) => {
       const { rows } = await client.query<{ id: number; app_user_id: number | null; is_active: boolean }>(
-        "SELECT id, app_user_id, is_active FROM devices WHERE app_id = $1 AND device_uid = $2 FOR UPDATE",
+        "SELECT id, app_user_id, is_active FROM devices WHERE app_id = $1 AND device_uid = $2",
         [app.id, body.deviceUid],
       );
       const existing = rows[0];

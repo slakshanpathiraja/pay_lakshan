@@ -1,5 +1,5 @@
 import { route } from "@/server/api/route";
-import { APP_USER_COLUMNS, mapDbError, USER_UNIQUE } from "@/server/commerce";
+import { APP_USER_COLUMNS, APP_USER_RETURNING, mapDbError, USER_UNIQUE } from "@/server/commerce";
 import { query } from "@/server/db/pool";
 import { ApiError, json } from "@/server/http";
 import { messageFor } from "@/server/messages";
@@ -10,8 +10,8 @@ export const PUT = route(
   async ({ req, scope, params, body }) => {
     try {
       const { rows } = await query(
-        `UPDATE app_users u SET name = $1, email = $2, phone = $3, phone_country = $4, updated_at = now()
-        WHERE id = $5 AND platform_id = $6 RETURNING ${APP_USER_COLUMNS}`,
+        `UPDATE app_users SET name = $1, email = $2, phone = $3, phone_country = $4, updated_at = now()
+        WHERE id = $5 AND platform_id = $6 RETURNING ${APP_USER_RETURNING}`,
         [
           body.name,
           body.email,

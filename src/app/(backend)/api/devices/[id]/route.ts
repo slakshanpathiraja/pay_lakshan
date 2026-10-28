@@ -14,7 +14,7 @@ export const PUT = route(
           app_user_id: number | null;
           is_active: boolean;
         }>(
-          "SELECT app_user_id, is_active FROM devices WHERE id = $1 AND platform_id = $2 FOR UPDATE",
+          "SELECT app_user_id, is_active FROM devices WHERE id = $1 AND platform_id = $2",
           [params.id, scope.platformId],
         );
         if (!current[0]) throw new ApiError(404, "NOT_FOUND");

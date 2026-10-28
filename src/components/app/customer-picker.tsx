@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { Combobox } from "@base-ui/react/combobox";
 import { CheckIcon, ChevronDownIcon, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -98,29 +98,34 @@ function NewCustomer({
 }
 
 /**
- * Search an app's (active) users by name, email or phone, or add a new one in place
- * (needs the Users card's create action).
+ * Search an app's (active) users by name, email or phone — the server returns the best 25
+ * for what is typed — or add a new one in place (needs the Users card's create action).
+ * `current`: the user already chosen (e.g. a device's owner), shown even when not in the results.
  */
 export function CustomerPicker({
   id,
   appId,
   value,
   onChange,
+  current,
 }: {
   id?: string;
   appId: number | undefined;
   value: number | null;
   onChange: (userId: number | null) => void;
+  current?: Pick<AppUser, "id" | "name" | "email"> | null;
 }) {
   const t = useT();
   const { can } = useAccess();
-  const { data: users = [], isFetching } = useAppUsersQuery(
-    { appId },
+  const [query, setQuery] = useState("");
+  const typed = useDeferredValue(query.trim());
+  const { data, isFetching } = useAppUsersQuery(
+    { appId, search: typed || undefined },
     { skip: !appId },
   );
+  const users = useMemo(() => data?.items ?? [], [data]);
   // shown right away, before the list refetches
   const [created, setCreated] = useState<AppUser[]>([]);
-  const [query, setQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const canAdd = can("users.create") && !!appId;
 
@@ -133,13 +138,18 @@ export function CustomerPicker({
         ),
       ]
         .filter((u) => u.is_active)
-        .map((u) => ({
+        .map((u): Option => ({
           value: u.id,
           label: u.name,
           email: u.email,
           phone: u.phone,
-        })),
-    [users, created, appId],
+        }))
+        .concat(
+          current && !users.some((u) => u.id === current.id)
+            ? [{ value: current.id, label: current.name, email: current.email, phone: null }]
+            : [],
+        ),
+    [users, created, appId, current],
   );
   const selected = options.find((o) => o.value === value) ?? null;
 

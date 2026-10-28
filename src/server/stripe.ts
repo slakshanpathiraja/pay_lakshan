@@ -1,8 +1,8 @@
 import "server-only";
 import Stripe from "stripe";
-import type pg from "pg";
 import { getConfig, getAppOrigin } from "./config";
 import { ApiError } from "./errors";
+import { query } from "./db/pool";
 
 // One Stripe account for every platform, from the environment (STRIPE_SECRET_KEY). Orders
 // are paid on a Stripe Checkout page; Stripe then calls /api/stripe/webhook (signed with
@@ -71,19 +71,18 @@ function returnUrl(url: string, orderNumber: string, withSession: boolean) {
  * subscription). An open older link is expired first so the customer can't pay twice.
  * Payment methods: whatever is enabled in the Stripe Dashboard (dynamic payment methods).
  * Returns null when Stripe isn't configured (no STRIPE_SECRET_KEY).
+ *
+ * Stripe is called outside any transaction (a transaction would hold the database's single
+ * write lock meanwhile); the link is saved only if the order didn't change in between.
  */
-export async function createCheckout(
-  client: pg.PoolClient,
-  orderId: number,
-  origin?: string,
-) {
-  const { rows } = await client.query<CheckoutOrder>(
+export async function createCheckout(orderId: number, origin?: string) {
+  const { rows } = await query<CheckoutOrder>(
     `SELECT o.id, o.platform_id, o.app_id, o.order_number, o.payment_status, o.currency, o.billing,
             o.interval_unit, o.interval_count, o.checkout_session_id, o.stripe_customer_id,
             o.stripe_subscription_id, o.google_purchase_token, u.email AS user_email,
             CASE WHEN o.order_status = 'active' AND o.ends_at <= now() THEN 'expired' ELSE o.order_status END AS state
        FROM orders o JOIN app_users u ON u.id = o.app_user_id
-      WHERE o.id = $1 FOR UPDATE OF o`,
+      WHERE o.id = $1`,
     [orderId],
   );
   const order = rows[0];
@@ -111,12 +110,12 @@ export async function createCheckout(
       if (old.status === "open") await stripe.checkout.sessions.expire(old.id);
     }
 
-    const { rows: items } = await client.query<{
+    const { rows: items } = await query<{
       name: string;
       quantity: number;
       unit_amount: number;
     }>(
-      "SELECT name, quantity, unit_amount::float8 AS unit_amount FROM order_items WHERE order_id = $1 ORDER BY id",
+      "SELECT name, quantity, unit_amount AS unit_amount FROM order_items WHERE order_id = $1 ORDER BY id",
       [order.id],
     );
     const subscription = order.billing === "recurring";
@@ -177,12 +176,18 @@ export async function createCheckout(
       ),
     });
 
-    await client.query(
-      `UPDATE orders SET checkout_session_id = $2, pay_url = $3, pay_url_expires_at = to_timestamp($4),
+    const { rowCount: saved } = await query(
+      `UPDATE orders SET checkout_session_id = $2, pay_url = $3, pay_url_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', $4, 'unixepoch'),
               updated_at = now()
-        WHERE id = $1`,
-      [order.id, session.id, session.url, session.expires_at],
+        WHERE id = $1 AND checkout_session_id IS $5 AND payment_status IN ('pending', 'failed')
+          AND order_status <> 'cancelled'`,
+      [order.id, session.id, session.url, session.expires_at, order.checkout_session_id],
     );
+    if (!saved) {
+      // another link was made, or the order was paid / cancelled, while we talked to Stripe
+      await stripe.checkout.sessions.expire(session.id).catch(() => {});
+      throw new ApiError(409, "PAYMENT_IN_PROGRESS");
+    }
     return {
       url: session.url!,
       expiresAt: new Date(session.expires_at * 1000).toISOString(),

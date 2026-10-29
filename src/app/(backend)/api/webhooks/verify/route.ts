@@ -7,7 +7,8 @@ import { ApiError, json } from "@/server/http";
 /**
  * The signed-in user's orders in this app — id, status (pending / active / expired /
  * cancelled), when access ends (null = never) and the order template's code (which plan;
- * null for a custom order). `email` must be theirs.
+ * null for a custom order). `email` must be theirs. `registeredAt` is when their account
+ * was made — an app can count a free trial from it.
  */
 export const GET = route("appApi.verify", async ({ req, query: q }) => {
   const app = await verifySignedRequest(q);
@@ -21,5 +22,6 @@ export const GET = route("appApi.verify", async ({ req, query: q }) => {
       ORDER BY o.created_at DESC`,
     [user.id, app.id],
   );
-  return json({ email: user.email, orders: rows });
+  const { rows: account } = await query<{ created_at: Date }>("SELECT created_at FROM app_users WHERE id = $1", [user.id]);
+  return json({ email: user.email, registeredAt: account[0].created_at, orders: rows });
 });

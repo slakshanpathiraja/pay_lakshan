@@ -225,6 +225,7 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
         label: "Orders, newest first",
         example: {
           email: SAMPLE_EMAIL,
+          registeredAt: "2026-09-12T08:30:00.000Z",
           orders: [
             { orderId: "ORD-261026-K7EGQ7", status: "active", expiresAt: "2026-11-26T10:00:00.000Z", template: "pro_monthly" },
             { orderId: "ORD-261001-AB12CD", status: "expired", expiresAt: "2026-10-01T10:00:00.000Z", template: "pro_monthly" },
@@ -240,6 +241,7 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
       "`expiresAt` null = never expires (lifetime).",
       "`template`: the order template's code — which plan was bought (null for a custom order). Check it when your app sells more than one plan.",
       "Give access while there is an active order whose `expiresAt` is null or in the future.",
+      "`registeredAt`: when the user's account was made (on the website or in an app) — count a free trial from it, so reinstalling the app doesn't start a new one.",
     ],
   },
 

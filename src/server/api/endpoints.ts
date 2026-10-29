@@ -605,6 +605,9 @@ export const endpoints = {
     path: "/api/users/{id}",
     tag: "Users",
     summary: "Delete a user (an app's customer)",
+    description:
+      "Deletes their devices, orders (with items and payment records) and sign-in tokens too. Open payment " +
+      "links and Stripe subscriptions are stopped first.",
     access: "permission",
     scope: true,
     params: idParams,

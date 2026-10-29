@@ -562,7 +562,7 @@ const en = {
     deleted: "User deleted",
     deleteTitle: "Delete {name}?",
     deleteDescription:
-      "Their devices are unlinked. Users with orders can't be deleted.",
+      "Their devices and orders (with payment records) are deleted too, and any subscription is cancelled in Stripe. This can't be undone.",
     emptyTitle: "No users yet",
     emptyText: "Add your app's customers here.",
   },
@@ -880,8 +880,6 @@ const en = {
     NOT_RENEWABLE: "Only subscription orders can be renewed",
     INVALID_APP: "Choose an app of this platform",
     APP_USER_EMAIL_TAKEN: "This app already has a user with that email",
-    USER_HAS_ORDERS:
-      "This user has orders, so they can't be deleted — deactivate them instead",
     DEVICE_TAKEN: "This device ID is already registered for this app",
     INVALID_USER: "Choose a user of the same app",
     ORDER_STATUS_INVALID:

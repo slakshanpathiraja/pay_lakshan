@@ -1,8 +1,9 @@
 import { route } from "@/server/api/route";
 import { APP_USER_COLUMNS, APP_USER_RETURNING, mapDbError, USER_UNIQUE } from "@/server/commerce";
-import { query } from "@/server/db/pool";
+import { query, withTransaction } from "@/server/db/pool";
 import { ApiError, json } from "@/server/http";
 import { messageFor } from "@/server/messages";
+import { stopStripeBilling } from "@/server/stripe";
 
 /** The app can't change — a user belongs to one app. */
 export const PUT = route(
@@ -33,15 +34,30 @@ export const PUT = route(
 );
 
 /** Users with orders are kept (the orders need them); their devices are unlinked. */
+/**
+ * Deletes the user with everything that is theirs: devices, orders (with their items,
+ * payments and queued webhooks) and sign-in tokens. Open payment links and Stripe
+ * subscriptions are stopped first, so nobody pays for or keeps being charged for a deleted
+ * order.
+ */
 export const DELETE = route("users.delete", async ({ scope, params }) => {
-  try {
-    const { rowCount } = await query(
-      "DELETE FROM app_users WHERE id = $1 AND platform_id = $2",
-      [params.id, scope.platformId],
-    );
-    if (!rowCount) throw new ApiError(404, "NOT_FOUND");
-    return new Response(null, { status: 204 });
-  } catch (err) {
-    mapDbError(err, { foreignKey: "USER_HAS_ORDERS" });
-  }
+  const { rows: user } = await query("SELECT id FROM app_users WHERE id = $1 AND platform_id = $2", [
+    params.id,
+    scope.platformId,
+  ]);
+  if (!user[0]) throw new ApiError(404, "NOT_FOUND");
+
+  const { rows: billed } = await query<{ checkout_session_id: string | null; stripe_subscription_id: string | null }>(
+    `SELECT checkout_session_id, stripe_subscription_id FROM orders
+      WHERE app_user_id = $1 AND (checkout_session_id IS NOT NULL OR stripe_subscription_id IS NOT NULL)`,
+    [params.id],
+  );
+  for (const order of billed) await stopStripeBilling(order);
+
+  await withTransaction(async (client) => {
+    await client.query("DELETE FROM devices WHERE app_user_id = $1", [params.id]);
+    await client.query("DELETE FROM orders WHERE app_user_id = $1", [params.id]);
+    await client.query("DELETE FROM app_users WHERE id = $1", [params.id]);
+  });
+  return new Response(null, { status: 204 });
 });

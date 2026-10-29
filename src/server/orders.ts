@@ -62,6 +62,20 @@ export async function fromTemplate(appId: number, by: { id?: number; code?: stri
 }
 
 /**
+ * A new Stripe payment link for the order (an open older one stops working). A failure
+ * doesn't throw: it comes back as `checkoutError`, in the request's language.
+ */
+export async function newPayLink(orderId: number, req: Request) {
+  try {
+    return { checkout: await createCheckout(orderId, getAppOrigin(req)), checkoutError: null };
+  } catch (err) {
+    if (!(err instanceof ApiError)) console.error("[orders] payment link", err);
+    const details = err instanceof ApiError && Array.isArray(err.details) ? ` (${err.details.join(", ")})` : "";
+    return { checkout: null, checkoutError: errorMessage(err instanceof ApiError ? err.code : "INTERNAL_ERROR", req) + details };
+  }
+}
+
+/**
  * A new order (payment and order pending) for a user of the app — from the dashboard or an
  * app (App API). A user may have up to `max_pending_orders` pending orders (default 3).
  * When Stripe is configured the order also gets a payment link right away; if Stripe
@@ -110,17 +124,8 @@ export async function createOrder(input: NewOrder, req: Request) {
     return rows[0];
   });
 
-  let checkout: { url: string; expiresAt: string } | null = null;
-  let checkoutError: string | null = null;
-  try {
-    if (input.createCheckout !== false) {
-      checkout = await createCheckout(order.id, getAppOrigin(req));
-    }
-  } catch (err) {
-    if (!(err instanceof ApiError)) console.error("[orders] payment link", err);
-    const details = err instanceof ApiError && Array.isArray(err.details) ? ` (${err.details.join(", ")})` : "";
-    checkoutError = errorMessage(err instanceof ApiError ? err.code : "INTERNAL_ERROR", req) + details;
-  }
+  const { checkout, checkoutError } =
+    input.createCheckout !== false ? await newPayLink(order.id, req) : { checkout: null, checkoutError: null };
   const { rows: users } = await query<{ email: string | null }>("SELECT email FROM app_users WHERE id = $1", [
     input.appUserId,
   ]);

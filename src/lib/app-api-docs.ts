@@ -189,6 +189,22 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
             payUrl: "https://checkout.stripe.com/c/pay/cs_test_…",
             payUrlExpiresAt: "2026-10-27T16:00:00.000Z",
           },
+          reused: false,
+          payUrlError: null,
+        },
+      },
+      {
+        status: 200,
+        label: "Unpaid order of this template reused",
+        example: {
+          order: {
+            orderId: "ORD-261026-K7EGQ7",
+            paymentStatus: "pending",
+            status: "pending",
+            payUrl: "https://checkout.stripe.com/c/pay/cs_test_…",
+            payUrlExpiresAt: "2026-10-27T18:00:00.000Z",
+          },
+          reused: true,
           payUrlError: null,
         },
       },
@@ -203,6 +219,7 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
     notes: [
       "Order from a template (`template`: its code) whenever you can: the price lives on the server, so a modified app can't change it. Custom orders (itemName + amount…) stay possible.",
       "Open `payUrl` for the user (browser / in-app browser). It works for 24 hours.",
+      "Ordering a `template` again while the user still has an unpaid pending order of it reuses that order (200, `reused: true`) with a new `payUrl` — the old link stops working. No second order is made, and it doesn't count against the pending limit.",
       "Android app paying with Google Play Billing: /order isn't needed — start the Play billing flow with `setObfuscatedAccountId(user.id)` (the `user.id` from /user) and the Google Play webhook creates the order from the purchase. To have the order before payment instead, call /order with `createCheckout` \"false\" and also pass `setObfuscatedProfileId(orderId)`. Both ways (Stripe, Google Play) end in the same orders, /verify and emails.",
       "`payUrl` is null when Stripe isn't set up or refused the order; `payUrlError` says why. The order is still created.",
       "Don't trust the redirect back from the payment page — check the order with /verify.",

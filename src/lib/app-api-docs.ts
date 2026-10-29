@@ -97,6 +97,7 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
     params: [
       { name: "email", required: "if", description: "The user's email (not case sensitive). With `password`; not with `googleIdToken`.", example: SAMPLE_EMAIL },
       { name: "password", required: "if", description: "At least 8 characters. With `email`.", example: "Demo@12345", secret: true },
+      { name: "mode", required: false, description: "With email + password. `signin`: an email your app doesn't have is refused (APP_USER_LOGIN_FAILED) instead of signed up. `signup`: an email that already has an account is refused (APP_USER_EXISTS) — unless the password is that account's, which just signs in. Leave it out to sign in or sign up as needed.", example: "signin" },
       { name: "googleIdToken", required: "if", description: "Sign in with Google instead of email + password: the ID token Google gave the app for the account the user picked (`idToken` from Google Sign-In, requested with the Web client ID set in this app's App config → Sign in with Google). The email comes from Google, already verified.", example: "", secret: true },
     ],
     responses: [
@@ -112,7 +113,8 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
       },
     ],
     errors: [
-      { status: 401, code: "APP_USER_LOGIN_FAILED", when: "Wrong password for this email, or the email belongs to a different Google account." },
+      { status: 401, code: "APP_USER_LOGIN_FAILED", when: "Wrong password for this email, the email belongs to a different Google account, or (`mode=signin`) the app has no user with this email." },
+      { status: 409, code: "APP_USER_EXISTS", when: "`mode=signup` and the email already has an account (with another password) — sign in instead." },
       { status: 401, code: "APP_USER_USE_GOOGLE", when: "Email + password for a user who signs in with Google (they have no password)." },
       { status: 401, code: "GOOGLE_TOKEN_INVALID", when: "`googleIdToken` isn't a valid, unexpired Google ID token issued for one of **this app's** client IDs (App config), or its email isn't verified — a token another app received is refused." },
       { status: 503, code: "GOOGLE_SIGNIN_NOT_CONFIGURED", when: "This app has no Google client ID in App config (Sign in with Google)." },

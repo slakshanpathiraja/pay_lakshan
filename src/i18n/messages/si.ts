@@ -853,6 +853,7 @@ const si: Messages = {
     INVALID_TOKEN: "Access token එක නැත, කල් ඉකුත් වී ඇත හෝ මෙම app එකට නොවේ — නැවත sign in වන්න හෝ refresh කරන්න",
     INVALID_REFRESH_TOKEN: "Refresh token එක වලංගු නැත, කල් ඉකුත් වී හෝ දැනටමත් ප්‍රතිස්ථාපනය කර ඇත — නැවත sign in වන්න",
     APP_USER_LOGIN_FAILED: "Email හෝ මුරපදය වැරදියි",
+    APP_USER_EXISTS: "මෙම email එකට දැනටමත් ගිණුමක් ඇත — පිවිසෙන්න",
     PENDING_ORDER_LIMIT: "මෙම පරිශීලකයාට අවසර ඇති තරම් pending ඇණවුම් දැනටමත් ඇත — එකක් ගෙවන තුරු හෝ අවලංගු කරන තුරු රැඳී සිටින්න, නැතහොත් සීමාව වැඩි කරන්න",
     STRIPE_SIGNATURE_INVALID:
       "Webhook අත්සන නොගැළපේ — STRIPE_WEBHOOK_SECRET පරීක්ෂා කරන්න",

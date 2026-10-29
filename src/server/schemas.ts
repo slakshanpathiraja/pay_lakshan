@@ -481,6 +481,8 @@ export const apiUserSchema = z
     password: z.string().min(8, "At least 8 characters").max(128).optional(),
     /** Sign in with Google: the ID token the app got from Google — instead of email + password */
     googleIdToken: z.string().min(1).max(4096).optional(),
+    /** with email + password: `signin` never creates an account, `signup` never signs in to someone else's */
+    mode: z.enum(["signin", "signup"]).optional(),
   })
   .refine((o) => (o.googleIdToken ? !o.email && !o.password : !!o.email && !!o.password), {
     message: "Send either googleIdToken, or email + password (not both)",

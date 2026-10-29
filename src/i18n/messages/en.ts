@@ -854,6 +854,7 @@ const en = {
     INVALID_TOKEN: "The access token is missing, expired or not for this app — sign in again or refresh it",
     INVALID_REFRESH_TOKEN: "The refresh token is invalid, expired or already replaced — sign in again",
     APP_USER_LOGIN_FAILED: "Incorrect email or password",
+    APP_USER_EXISTS: "This email already has an account — sign in instead",
     PENDING_ORDER_LIMIT: "This user already has as many pending orders as allowed — wait for one to be paid or cancelled, or raise their limit",
     STRIPE_SIGNATURE_INVALID:
       "The webhook signature doesn't match — check STRIPE_WEBHOOK_SECRET",

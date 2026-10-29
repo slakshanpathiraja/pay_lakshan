@@ -26,6 +26,8 @@ const COLUMNS = "id, name, email, password_hash, google_sub, is_active";
  * picked on the device; Google has verified its email, so no password).
  * A user added in the dashboard (no password yet) sets it on the first call, or links their
  * Google account. A new user gets a welcome email (queued; sent after the response).
+ * `mode` (email + password only): `signin` refuses an unknown email instead of signing it up;
+ * `signup` refuses an email that already has an account, unless the password is its own.
  */
 export const POST = route("appApi.user", async ({ req, body }) => {
   const app = await verifySignedRequest(body);
@@ -48,6 +50,7 @@ export const POST = route("appApi.user", async ({ req, body }) => {
   );
   let user = rows[0];
   let created = false;
+  if (!user && body.mode === "signin") throw new ApiError(401, "APP_USER_LOGIN_FAILED");
   if (!user) {
     try {
       const { rows: inserted } = await query<AppUserRow>(
@@ -81,6 +84,7 @@ export const POST = route("appApi.user", async ({ req, body }) => {
       user.id,
     ]);
   } else if (!(await bcrypt.compare(body.password!, user.password_hash))) {
+    if (body.mode === "signup") throw new ApiError(409, "APP_USER_EXISTS");
     throw new ApiError(401, "APP_USER_LOGIN_FAILED");
   }
   if (!user.is_active) throw new ApiError(403, "ACCOUNT_DISABLED");

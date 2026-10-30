@@ -21,8 +21,7 @@ import {
   UserRound,
   Users,
   UsersRound,
-  type LucideIcon,
-} from "lucide-react";
+  type LucideIcon, Activity } from "lucide-react";
 import type { TranslationKey } from "@/i18n/config";
 import { hasAccess, type AccessInfo } from "@/lib/access";
 
@@ -182,6 +181,13 @@ export const menuGroups: MenuGroup[] = [
         title: "menu.webhookRefresh",
         href: "/webhooks/refresh",
         icon: RefreshCw,
+        access: "authenticated",
+      },
+      {
+        key: "webhook-heartbeat",
+        title: "menu.webhookHeartbeat",
+        href: "/webhooks/heartbeat",
+        icon: Activity,
         access: "authenticated",
       },
       {

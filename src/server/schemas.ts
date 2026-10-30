@@ -190,6 +190,8 @@ export const platformIdParams = z.object({ id: z.uuid() });
 
 export const platformSchema = z.object({
   name: z.string().trim().min(1).max(80),
+  /** uses the *_TEST payment settings (Stripe test mode, the test Play account) */
+  isTest: z.boolean().optional(),
 });
 
 export const switchPlatformSchema = z.object({ platformId: z.uuid() });
@@ -527,6 +529,12 @@ export const apiOrderSchema = z
   });
 export const apiVerifyQuery = z.strictObject({ ...signed, email: apiEmail });
 export const apiRefreshSchema = z.strictObject({ ...signed, refreshToken: z.string().min(1).max(200) });
+export const apiHeartbeatSchema = z.strictObject({
+  ...signed,
+  deviceUid: z.string().min(1).max(191),
+  /** the app's version, shown in the dashboard */
+  appVersion: z.string().trim().max(40).optional(),
+});
 
 export const dashboardStatsQuery = z.strictObject({
   appId: z.coerce.number().int().positive().optional(),

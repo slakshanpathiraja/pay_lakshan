@@ -47,8 +47,8 @@ export const DELETE = route("users.delete", async ({ scope, params }) => {
   ]);
   if (!user[0]) throw new ApiError(404, "NOT_FOUND");
 
-  const { rows: billed } = await query<{ checkout_session_id: string | null; stripe_subscription_id: string | null }>(
-    `SELECT checkout_session_id, stripe_subscription_id FROM orders
+  const { rows: billed } = await query<{ platform_id: string; checkout_session_id: string | null; stripe_subscription_id: string | null }>(
+    `SELECT platform_id, checkout_session_id, stripe_subscription_id FROM orders
       WHERE app_user_id = $1 AND (checkout_session_id IS NOT NULL OR stripe_subscription_id IS NOT NULL)`,
     [params.id],
   );

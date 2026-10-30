@@ -45,6 +45,7 @@ function toArg(value: unknown) {
 
 const BOOLEAN_COLUMNS = new Set([
   "is_active",
+  "is_test",
   "is_system",
   "is_default",
   "must_change_password",

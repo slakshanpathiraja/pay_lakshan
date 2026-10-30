@@ -22,6 +22,7 @@ import {
   apiDeviceSchema,
   apiOrderSchema,
   apiRefreshSchema,
+  apiHeartbeatSchema,
   apiUserSchema,
   apiVerifyQuery,
   changePasswordSchema,
@@ -893,6 +894,19 @@ export const endpoints = {
       "`refreshToken` is null — keep using yours." + SIGNED,
     access: "public",
     body: apiRefreshSchema,
+  },
+  "appApi.heartbeat": {
+    method: "POST",
+    path: "/api/webhooks/heartbeat",
+    tag: "App API",
+    summary: "The signed-in user's device is in use — records when it was last seen",
+    description:
+      "Needs `Authorization: Bearer <accessToken>`; the device must be this user's (registered with /device) " +
+      "and active. Call it when the app starts and every few minutes while it runs; the dashboard shows the " +
+      "device as active, or when it was last seen. DEVICE_INACTIVE / DEVICE_NOT_REGISTERED: the device was " +
+      "turned off or removed in the dashboard — sign the app out." + SIGNED,
+    access: "public",
+    body: apiHeartbeatSchema,
   },
 
   // Google Play webhook: Real-time developer notifications (Pub/Sub push)

@@ -17,6 +17,7 @@ export const TABLES: string[] = [
     id          TEXT     PRIMARY KEY,
     name        TEXT     NOT NULL,
     is_active   INTEGER  NOT NULL DEFAULT 1,
+    is_test     INTEGER  NOT NULL DEFAULT 0,
     created_at  ${TS},
     updated_at  ${TS}
   )`,
@@ -200,6 +201,8 @@ export const TABLES: string[] = [
     model        TEXT,
     fingerprint  TEXT,
     is_active    INTEGER  NOT NULL DEFAULT 1,
+    last_seen_at TEXT,
+    app_version  TEXT,
     created_at   ${TS},
     updated_at   ${TS},
     UNIQUE (app_id, device_uid),
@@ -442,4 +445,16 @@ export const TRIGGERS: string[] = [
   `CREATE TRIGGER IF NOT EXISTS orders_renewed_webhooks AFTER UPDATE OF ends_at ON orders
    WHEN ${renewed}
    BEGIN ${webhooks("order.renewed", "'{}'")} END`,
+];
+
+/**
+ * Columns added after a table was first created (CREATE TABLE IF NOT EXISTS doesn't add them
+ * to an existing table): migrate() adds each one that's missing.
+ */
+export const ADDED_COLUMNS: { table: string; column: string; definition: string }[] = [
+  // last heartbeat from the device's app (App API /heartbeat), and the version it runs
+  { table: "devices", column: "last_seen_at", definition: "TEXT" },
+  { table: "devices", column: "app_version", definition: "TEXT" },
+  // a test platform uses the *_TEST payment settings (pay-mode.ts)
+  { table: "platforms", column: "is_test", definition: "INTEGER NOT NULL DEFAULT 0" },
 ];

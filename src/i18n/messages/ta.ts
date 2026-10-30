@@ -45,6 +45,7 @@ const ta: Messages = {
     webhookOrder: "ஆர்டர் உருவாக்கம்",
     webhookVerify: "ஆர்டர் சரிபார்ப்பு",
     webhookRefresh: "Token புதுப்பிப்பு",
+    webhookHeartbeat: "சாதன heartbeat",
     payments: "கொடுப்பனவுகள்",
     users: "பயனர்கள்",
     devices: "சாதனங்கள்",
@@ -373,6 +374,9 @@ const ta: Messages = {
     delete: "நீக்கு",
   },
   platforms: {
+    testPlatform: "சோதனைத் தளம்",
+    testPlatformHint: "சோதனைக் கட்டண அமைப்புகளைப் பயன்படுத்துகிறது (STRIPE_*_TEST, GOOGLE_PLAY_*_TEST). கட்டணங்கள் வந்த பிறகு மாற்ற முடியாது.",
+    testBadge: "Test",
     manageMine: "தளத்தை நிர்வகி",
     yourPlatforms: "உங்கள் தளங்கள்",
     myPlatformNote:
@@ -585,6 +589,9 @@ const ta: Messages = {
     emptyText: "உங்கள் பயன்பாட்டின் வாடிக்கையாளர்களை இங்கே சேர்க்கவும்.",
   },
   devices: {
+    lastSeen: "கடைசியாகக் காணப்பட்டது",
+    activeNow: "இப்போது செயலில்",
+    neverSeen: "ஒருபோதும் இல்லை",
     fingerprint: "சாதன fingerprint",
     fingerprintHint:
       "விருப்பம்: உங்கள் பயன்பாடு சாதனத்திற்குக் கணக்கிடும் fingerprint.",
@@ -903,6 +910,8 @@ const ta: Messages = {
     INVALID_APP: "இந்தத் தளத்தின் பயன்பாட்டைத் தேர்ந்தெடுக்கவும்",
     APP_USER_EMAIL_TAKEN:
       "இந்தப் பயன்பாட்டில் அந்த மின்னஞ்சலுடன் ஒரு பயனர் ஏற்கனவே உள்ளார்",
+    DEVICE_NOT_REGISTERED: "இந்தச் சாதனம் இந்தக் கணக்கில் பதிவு செய்யப்படவில்லை",
+    DEVICE_INACTIVE: "இந்தச் சாதனம் dashboard-இல் முடக்கப்பட்டுள்ளது",
     DEVICE_TAKEN:
       "இந்த device ID இந்தப் பயன்பாட்டிற்கு ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது",
     INVALID_USER: "அதே பயன்பாட்டின் பயனரைத் தேர்ந்தெடுக்கவும்",
@@ -921,6 +930,7 @@ const ta: Messages = {
     NO_PLATFORM: "இந்தக் கணக்கு இன்னும் எந்தத் தளத்திலும் இல்லை",
     INVALID_PLATFORM: "அந்தத் தளம் இல்லை",
     PLATFORM_NAME_TAKEN: "இந்தப் பெயரில் ஏற்கனவே ஒரு தளம் உள்ளது",
+    PLATFORM_MODE_LOCKED: "இந்தத் தளத்தில் ஏற்கனவே கட்டணங்கள் உள்ளன — test / இயல்பு இனி மாற்ற முடியாது",
     ALREADY_MEMBER: "இந்தக் கணக்கு ஏற்கனவே இந்தத் தளத்தில் உள்ளது",
     CUSTOM_ORDERS_OFF: "இந்த ஆப் அதன் ஆர்டர் வார்ப்புருக்களிலிருந்து மட்டுமே ஆர்டர்களை ஏற்கும் — `template` அனுப்பவும்",
     MANAGER_ON_OTHER_PLATFORMS: "இந்தக் கணக்கு மற்ற தளங்களிலும் உள்ளது — super admin மட்டுமே அதன் கடவுச்சொல்லை மீட்டமைக்கவோ முடக்கவோ முடியும்",

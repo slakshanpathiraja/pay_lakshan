@@ -12,6 +12,7 @@ export interface PlatformRow {
   id: string;
   name: string;
   is_active: boolean;
+  is_test: boolean;
   member_count: number;
   role_count: number;
   created_at: Date;
@@ -27,12 +28,12 @@ export const PLATFORM_SELECT = `p.*,
  * Creates a platform (a random UUID) and its built-in Manager role, which
  * gets the default grants from seed/permissions.json (`newPlatform.managerGrants`, by card key).
  */
-export async function createPlatform(client: DbClient, name: string) {
+export async function createPlatform(client: DbClient, name: string, isTest = false) {
   let platformId: string;
   try {
     const { rows } = await client.query<{ id: string }>(
-      "INSERT INTO platforms (id, name) VALUES ($1, $2) RETURNING id",
-      [randomUUID(), name],
+      "INSERT INTO platforms (id, name, is_test) VALUES ($1, $2, $3) RETURNING id",
+      [randomUUID(), name, isTest],
     );
     platformId = rows[0].id;
   } catch (err) {

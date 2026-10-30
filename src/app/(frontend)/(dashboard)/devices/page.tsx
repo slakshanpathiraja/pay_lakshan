@@ -29,7 +29,7 @@ import { ScopeBar, useScope } from "@/components/app/scope";
 import { StatusSwitch } from "@/components/app/status-switch";
 import { useAccess } from "@/hooks/use-access";
 import { useLocale, useT } from "@/i18n";
-import { formatDateTime } from "@/lib/format";
+import { formatAgo, formatDateTime } from "@/lib/format";
 import {
   useDeleteDeviceMutation,
   useDevicesQuery,
@@ -95,6 +95,7 @@ export default function DevicesPage() {
                   {t("devices.user")}
                 </TableHead>
                 <TableHead>{t("status.title")}</TableHead>
+                <TableHead>{t("devices.lastSeen")}</TableHead>
                 <TableHead className="hidden lg:table-cell">
                   {t("apps.added")}
                 </TableHead>
@@ -106,14 +107,14 @@ export default function DevicesPage() {
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <Skeleton className="h-6" />
                   </TableCell>
                 </TableRow>
               )}
               {devices?.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-12 text-center">
+                  <TableCell colSpan={8} className="py-12 text-center">
                     <Smartphone className="mx-auto mb-2 size-6 text-muted-foreground" />
                     <p className="font-medium">{t("devices.emptyTitle")}</p>
                     <p className="text-sm text-muted-foreground">
@@ -160,6 +161,9 @@ export default function DevicesPage() {
                         canStatus ? null : t("status.noPermission")
                       }
                     />
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    <LastSeen device={d} />
                   </TableCell>
                   <TableCell className="hidden text-sm lg:table-cell">
                     {formatDateTime(d.created_at, locale, "—")}
@@ -222,6 +226,34 @@ export default function DevicesPage() {
         onConfirm={confirmDelete}
         onClose={() => setToDelete(null)}
       />
+    </div>
+  );
+}
+
+/** A heartbeat this recent counts as "active now". */
+const ACTIVE_MS = 10 * 60 * 1000;
+
+/** "Active now" (green), or how long ago the device's app was last seen, and its version. */
+function LastSeen({ device }: { device: Device }) {
+  const t = useT();
+  const { locale } = useLocale();
+  const seen = device.last_seen_at;
+  const active = !!seen && Date.now() - new Date(seen).getTime() < ACTIVE_MS;
+  return (
+    <div className="grid">
+      {!seen ? (
+        <span className="text-muted-foreground">{t("devices.neverSeen")}</span>
+      ) : active ? (
+        <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+          <span className="size-2 rounded-full bg-emerald-500" aria-hidden />
+          {t("devices.activeNow")}
+        </span>
+      ) : (
+        <span title={formatDateTime(seen, locale, "")}>{formatAgo(seen, locale)}</span>
+      )}
+      {device.app_version && (
+        <span className="text-xs text-muted-foreground">v{device.app_version}</span>
+      )}
     </div>
   );
 }

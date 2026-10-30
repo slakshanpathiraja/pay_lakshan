@@ -1,32 +1,33 @@
 import "server-only";
 import Stripe from "stripe";
 import { getConfig, getAppOrigin } from "./config";
+import { platformMode, stripeSettings } from "./pay-mode";
 import { ApiError } from "./errors";
 import { query } from "./db/pool";
 
-// One Stripe account for every platform, from the environment (STRIPE_SECRET_KEY). Orders
-// are paid on a Stripe Checkout page; Stripe then calls /api/stripe/webhook (signed with
-// STRIPE_WEBHOOK_SECRET) and the webhook (stripe-webhook.ts) finds the order from the
-// session's metadata, updates it and records the payment.
+// Two Stripe accounts/modes from the environment: STRIPE_SECRET_KEY for normal platforms and
+// STRIPE_SECRET_KEY_TEST for platforms marked "test" (pay-mode.ts). Orders are paid on a
+// Stripe Checkout page; Stripe then calls /api/stripe/webhook (signed with the mode's webhook
+// secret) and the webhook (stripe-webhook.ts) finds the order from the session's metadata —
+// only among that mode's platforms — updates it and records the payment.
 
-const globalForStripe = globalThis as unknown as {
-  stripe?: { key: string; client: Stripe };
-};
+const globalForStripe = globalThis as unknown as { stripeClients?: Map<string, Stripe> };
 
-/** The Stripe client, or null when STRIPE_SECRET_KEY isn't set. */
-export function stripeClient() {
-  const key = getConfig().STRIPE_SECRET_KEY;
-  if (!key) return null;
-  if (globalForStripe.stripe?.key !== key) {
-    globalForStripe.stripe = {
-      key,
-      client: new Stripe(key, {
-        maxNetworkRetries: 2,
-        appInfo: { name: "Pay Portal" },
-      }),
-    };
+/** A Stripe client for this key (one per key, reused). */
+export function stripeForKey(key: string) {
+  const clients = (globalForStripe.stripeClients ??= new Map());
+  let client = clients.get(key);
+  if (!client) {
+    client = new Stripe(key, { maxNetworkRetries: 2, appInfo: { name: "Pay Portal" } });
+    clients.set(key, client);
   }
-  return globalForStripe.stripe.client;
+  return client;
+}
+
+/** The platform's Stripe client (test or live keys), or null when that key isn't set. */
+export async function stripeClient(platformId: string) {
+  const { secretKey } = stripeSettings(await platformMode(platformId));
+  return secretKey ? stripeForKey(secretKey) : null;
 }
 
 /** A Stripe API error as an API error, with Stripe's own message as the detail. */
@@ -96,7 +97,7 @@ export async function createCheckout(orderId: number, origin?: string) {
   ) {
     throw new ApiError(409, "CHECKOUT_NOT_ALLOWED");
   }
-  const stripe = stripeClient();
+  const stripe = await stripeClient(order.platform_id);
   if (!stripe) return null;
 
   try {
@@ -202,11 +203,12 @@ export async function createCheckout(orderId: number, origin?: string) {
  * Stripe subscription (if any) is cancelled, so the customer isn't charged again.
  */
 export async function stopStripeBilling(order: {
+  platform_id: string;
   checkout_session_id: string | null;
   stripe_subscription_id: string | null;
 }) {
   if (!order.checkout_session_id && !order.stripe_subscription_id) return;
-  const stripe = stripeClient();
+  const stripe = await stripeClient(order.platform_id);
   if (!stripe) return;
   try {
     if (order.checkout_session_id) {

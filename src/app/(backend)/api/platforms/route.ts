@@ -34,6 +34,7 @@ export const POST = route("platforms.create", async ({ user, body }) => {
     const { platformId, managerRoleId } = await createPlatform(
       client,
       body.name,
+      body.isTest ?? false,
     );
     const account = await createPlatformManager(client, {
       id: platformId,

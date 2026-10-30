@@ -8,11 +8,15 @@ import { setPermissionUrls, setRoleGrants, syncSuperAdminGrants, validateUrls } 
 import { permissionUrlSchema } from "../schemas";
 import seedFile from "../seed/permissions.json";
 import { batch, query, withTransaction } from "./pool";
-import { INDEXES, TABLES, TRIGGERS } from "./schema";
+import { INDEXES, TABLES, TRIGGERS, ADDED_COLUMNS } from "./schema";
 
 /** Tables, indexes and triggers (all "IF NOT EXISTS"), and the four actions. */
 async function migrate() {
   await batch([...TABLES, ...INDEXES, ...TRIGGERS]);
+  for (const { table, column, definition } of ADDED_COLUMNS) {
+    const { rows } = await query("SELECT 1 FROM pragma_table_info($1) WHERE name = $2", [table, column]);
+    if (!rows.length) await query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
   for (const action of ACTIONS) await query("INSERT OR IGNORE INTO actions (key) VALUES ($1)", [action]);
 }
 
@@ -175,7 +179,7 @@ async function seedFirstRun() {
 
 // Bump when the schema or a seed changes: servers then run setup once more (a hot-reloaded dev
 // server too) — otherwise it's skipped because the database says it's done.
-const SCHEMA_VERSION = 48;
+const SCHEMA_VERSION = 50;
 
 const globalForInit = globalThis as unknown as {
   dbReady?: Promise<void>;

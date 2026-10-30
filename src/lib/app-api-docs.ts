@@ -2,7 +2,7 @@
 // used by their playground. Written in English like the API itself; keep it in step with
 // src/server/schemas.ts (api*Schema) and the route handlers.
 
-export const APP_API_ENDPOINTS = ["user", "device", "order", "verify", "refresh"] as const;
+export const APP_API_ENDPOINTS = ["user", "device", "order", "verify", "refresh", "heartbeat"] as const;
 export type AppApiEndpoint = (typeof APP_API_ENDPOINTS)[number];
 
 export const isAppApiEndpoint = (v: string): v is AppApiEndpoint =>
@@ -303,6 +303,37 @@ export const APP_API_DOCS: Record<AppApiEndpoint, ApiDoc> = {
     notes: [
       "When `refreshTokenRotated` is true, save the new `refreshToken` — the old one no longer works.",
       "When it's false, `refreshToken` is null: keep using the one you have.",
+    ],
+  },
+
+  heartbeat: {
+    key: "heartbeat",
+    method: "POST",
+    path: "/api/webhooks/heartbeat",
+    title: "Device heartbeat",
+    summary: "Tells pay the signed-in user's device is in use, so the dashboard shows it as active (or when it was last seen).",
+    token: true,
+    params: [
+      { name: "deviceUid", required: true, description: "The device ID the app registered with /device.", example: "device-123" },
+      { name: "appVersion", required: false, description: "The app's version, shown on the Devices page (max 40).", example: "1.3.0" },
+    ],
+    responses: [
+      {
+        status: 200,
+        label: "Recorded",
+        example: { device: { deviceId: "device-123", status: "active" } },
+      },
+    ],
+    errors: [
+      ...TOKEN_ERRORS,
+      { status: 404, code: "DEVICE_NOT_REGISTERED", when: "This user has no device with this ID (never registered, or deleted in the dashboard) — sign the app out." },
+      { status: 403, code: "DEVICE_INACTIVE", when: "The device was turned off in the dashboard — sign the app out." },
+      { status: 429, code: "TOO_MANY_ATTEMPTS", when: "More than 30 heartbeats for this device in 15 minutes." },
+    ],
+    notes: [
+      "Send one when the app starts and every few minutes while it runs (every 5 minutes is plenty).",
+      "The dashboard shows a device as active when its last heartbeat is under 10 minutes old.",
+      "Heartbeats closer than a minute apart are answered but not written.",
     ],
   },
 };

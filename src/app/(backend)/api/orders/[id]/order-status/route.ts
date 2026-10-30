@@ -47,7 +47,7 @@ export const PATCH = route(
       if (body.status === "cancelled") {
         await stopStripeBilling(order);
         if (order.google_purchase_token && order.billing === "recurring") {
-          const play = playClient();
+          const play = await playClient(order.platform_id);
           if (!play) throw new ApiError(503, "GOOGLE_PLAY_NOT_CONFIGURED");
           await stopGooglePlayBilling(play, order);
         }

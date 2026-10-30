@@ -43,6 +43,7 @@ const en = {
     webhookOrder: "Create order",
     webhookVerify: "Verify orders",
     webhookRefresh: "Refresh token",
+    webhookHeartbeat: "Device heartbeat",
     payments: "Payments",
     users: "Users",
     devices: "Devices",
@@ -361,6 +362,9 @@ const en = {
     delete: "Delete",
   },
   platforms: {
+    testPlatform: "Test platform",
+    testPlatformHint: "Uses the test payment settings (STRIPE_*_TEST, GOOGLE_PLAY_*_TEST): Stripe test cards, the test Play account. Can't be changed once it has payments.",
+    testBadge: "Test",
     manageMine: "Manage platform",
     yourPlatforms: "Your platforms",
     myPlatformNote:
@@ -567,6 +571,9 @@ const en = {
     emptyText: "Add your app's customers here.",
   },
   devices: {
+    lastSeen: "Last seen",
+    activeNow: "Active now",
+    neverSeen: "Never",
     fingerprint: "Device fingerprint",
     fingerprintHint:
       "Optional: the fingerprint your app computes for the device.",
@@ -881,6 +888,8 @@ const en = {
     INVALID_APP: "Choose an app of this platform",
     APP_USER_EMAIL_TAKEN: "This app already has a user with that email",
     DEVICE_TAKEN: "This device ID is already registered for this app",
+    DEVICE_NOT_REGISTERED: "This device isn't registered to this account",
+    DEVICE_INACTIVE: "This device was turned off in the dashboard",
     INVALID_USER: "Choose a user of the same app",
     ORDER_STATUS_INVALID:
       "The order can't change to that status from its current one",
@@ -896,6 +905,7 @@ const en = {
     NO_PLATFORM: "This account isn't on any platform yet",
     INVALID_PLATFORM: "That platform doesn't exist",
     PLATFORM_NAME_TAKEN: "A platform with this name already exists",
+    PLATFORM_MODE_LOCKED: "This platform already has payments — test / normal can't change any more",
     ALREADY_MEMBER: "This account is already on this platform",
     CUSTOM_ORDERS_OFF: "This app only takes orders from its order templates — send `template`",
     MANAGER_ON_OTHER_PLATFORMS: "This account also belongs to other platforms — only a super admin can reset its password or turn it off",

@@ -45,6 +45,7 @@ const si: Messages = {
     webhookOrder: "ඇණවුමක් සෑදීම",
     webhookVerify: "ඇණවුම් තහවුරු කිරීම",
     webhookRefresh: "Token refresh",
+    webhookHeartbeat: "උපාංග heartbeat",
     payments: "ගෙවීම්",
     users: "පරිශීලකයින්",
     devices: "උපාංග",
@@ -359,6 +360,9 @@ const si: Messages = {
     delete: "මැකීම",
   },
   platforms: {
+    testPlatform: "Test වේදිකාව",
+    testPlatformHint: "Test ගෙවීම් සැකසුම් භාවිතා කරයි (STRIPE_*_TEST, GOOGLE_PLAY_*_TEST). ගෙවීම් ලැබුණු පසු වෙනස් කළ නොහැක.",
+    testBadge: "Test",
     manageMine: "වේදිකාව කළමනාකරණය",
     yourPlatforms: "ඔබගේ වේදිකා",
     myPlatformNote:
@@ -565,6 +569,9 @@ const si: Messages = {
     emptyText: "ඔබගේ යෙදුමේ පාරිභෝගිකයින් මෙහි එක් කරන්න.",
   },
   devices: {
+    lastSeen: "අවසන් වරට දුටුවේ",
+    activeNow: "දැන් සක්‍රියයි",
+    neverSeen: "කිසිදා නැත",
     fingerprint: "උපාංග fingerprint",
     fingerprintHint: "විකල්ප: ඔබගේ යෙදුම උපාංගය සඳහා ගණනය කරන fingerprint.",
     title: "උපාංග",
@@ -878,6 +885,8 @@ const si: Messages = {
     INVALID_APP: "මෙම වේදිකාවේ යෙදුමක් තෝරන්න",
     APP_USER_EMAIL_TAKEN: "මෙම යෙදුමේ එම email සහිත පරිශීලකයෙක් දැනටමත් ඇත",
     DEVICE_TAKEN: "මෙම device ID මෙම යෙදුම සඳහා දැනටමත් ලියාපදිංචි කර ඇත",
+    DEVICE_NOT_REGISTERED: "මෙම උපාංගය මෙම ගිණුමට ලියාපදිංචි කර නැත",
+    DEVICE_INACTIVE: "මෙම උපාංගය dashboard එකෙන් අක්‍රිය කර ඇත",
     INVALID_USER: "එම යෙදුමේම පරිශීලකයෙක් තෝරන්න",
     ORDER_STATUS_INVALID:
       "ඇණවුමට එහි වත්මන් තත්ත්වයෙන් එම තත්ත්වයට වෙනස් විය නොහැක",
@@ -893,6 +902,7 @@ const si: Messages = {
     NO_PLATFORM: "මෙම ගිණුම තවම කිසිදු වේදිකාවක නැත",
     INVALID_PLATFORM: "එම වේදිකාව නොපවතී",
     PLATFORM_NAME_TAKEN: "මෙම නමින් වේදිකාවක් දැනටමත් ඇත",
+    PLATFORM_MODE_LOCKED: "මෙම වේදිකාවට දැනටමත් ගෙවීම් ඇත — test / සාමාන්‍ය තවදුරටත් වෙනස් කළ නොහැක",
     ALREADY_MEMBER: "මෙම ගිණුම දැනටමත් මෙම වේදිකාවේ ඇත",
     CUSTOM_ORDERS_OFF: "මෙම ඇප් එක ඇණවුම් ගන්නේ එහි ඇණවුම් සැකිලිවලින් පමණි — `template` යවන්න",
     MANAGER_ON_OTHER_PLATFORMS: "මෙම ගිණුම වෙනත් වේදිකාවලත් ඇත — එහි මුරපදය යළි සැකසීමට හෝ අක්‍රිය කිරීමට හැක්කේ super admin කෙනෙකුට පමණි",

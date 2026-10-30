@@ -1,6 +1,6 @@
 import "server-only";
 import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "jose";
-import { getConfig } from "./config";
+import { PAY_MODES, platformMode, playSettings, type PayMode } from "./pay-mode";
 import { ApiError } from "./errors";
 
 // Google Play Billing — one Google Cloud service account for every platform (environment),
@@ -84,9 +84,9 @@ interface ServiceAccount {
   token_uri?: string;
 }
 
-/** GOOGLE_PLAY_SERVICE_ACCOUNT: the key file's JSON, as is or base64. */
-function serviceAccount(): ServiceAccount | null {
-  const raw = getConfig().GOOGLE_PLAY_SERVICE_ACCOUNT;
+/** The mode's service account key (GOOGLE_PLAY_SERVICE_ACCOUNT[_TEST]): its JSON, as is or base64. */
+function serviceAccount(mode: PayMode): ServiceAccount | null {
+  const raw = playSettings(mode).serviceAccount;
   if (!raw) return null;
   const text = raw.trim().startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8");
   const parsed = JSON.parse(text) as ServiceAccount;
@@ -94,11 +94,12 @@ function serviceAccount(): ServiceAccount | null {
   return parsed;
 }
 
-const globalForPlay = globalThis as unknown as { playToken?: { value: string; expiresAt: number } };
+const globalForPlay = globalThis as unknown as { playTokens?: Map<string, { value: string; expiresAt: number }> };
 
-/** An OAuth access token for the service account (cached until shortly before it ends). */
+/** An OAuth access token for the service account (cached per account until shortly before it ends). */
 async function accessToken(account: ServiceAccount) {
-  const cached = globalForPlay.playToken;
+  const tokens = (globalForPlay.playTokens ??= new Map());
+  const cached = tokens.get(account.client_email);
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.value;
   const tokenUri = account.token_uri ?? "https://oauth2.googleapis.com/token";
   const assertion = await new SignJWT({ scope: SCOPE })
@@ -117,7 +118,7 @@ async function accessToken(account: ServiceAccount) {
   if (!res.ok || !body.access_token) {
     throw new ApiError(502, "GOOGLE_PLAY_ERROR", [body.error_description ?? `token request failed (${res.status})`]);
   }
-  globalForPlay.playToken = { value: body.access_token, expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000 };
+  tokens.set(account.client_email, { value: body.access_token, expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000 });
   return body.access_token;
 }
 
@@ -132,9 +133,14 @@ async function call<T>(account: ServiceAccount, method: "GET" | "POST", url: str
   return body as T;
 }
 
-/** The Google Play client, or null when GOOGLE_PLAY_SERVICE_ACCOUNT isn't set. */
-export function playClient(): PlayClient | null {
-  const account = serviceAccount();
+/** The platform's Google Play client (test or normal account), or null when it isn't set. */
+export async function playClient(platformId: string): Promise<PlayClient | null> {
+  return playClientFor(await platformMode(platformId));
+}
+
+/** The Google Play client of a mode's account, or null when it isn't set. */
+export function playClientFor(mode: PayMode): PlayClient | null {
+  const account = serviceAccount(mode);
   if (!account) return null;
   const enc = encodeURIComponent;
   return {
@@ -160,22 +166,30 @@ export const googleKeys = createRemoteJWKSet(new URL("https://www.googleapis.com
 
 /**
  * A push request from Pub/Sub carries a Google-signed OIDC token (push subscription →
- * Authentication). Its audience must be GOOGLE_PLAY_PUSH_AUDIENCE, and when
- * GOOGLE_PLAY_PUSH_EMAIL is set it must be signed for that service account.
+ * Authentication). Its audience and sender must be one mode's GOOGLE_PLAY_PUSH_AUDIENCE /
+ * GOOGLE_PLAY_PUSH_EMAIL (or the *_TEST pair): that mode is returned, and the notification
+ * may only touch that mode's platforms.
  */
-export async function verifyPushRequest(req: Request) {
-  const { GOOGLE_PLAY_PUSH_AUDIENCE: audience, GOOGLE_PLAY_PUSH_EMAIL: email } = getConfig();
-  // both are needed: without the sender, any Google service account could mint a token
-  // with this audience
-  if (!audience || !email) throw new ApiError(503, "GOOGLE_PLAY_NOT_CONFIGURED");
+export async function verifyPushRequest(req: Request): Promise<PayMode> {
+  const accounts = PAY_MODES.map((mode) => ({ mode, ...playSettings(mode) })).filter(
+    // both are needed: without the sender, any Google service account could mint a token
+    // with this audience
+    (a) => a.pushAudience && a.pushEmail,
+  );
+  if (!accounts.length) throw new ApiError(503, "GOOGLE_PLAY_NOT_CONFIGURED");
   const token = req.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
   if (!token) throw new ApiError(401, "GOOGLE_PUSH_UNAUTHORIZED");
   try {
     const { payload } = await jwtVerify<{ email?: string; email_verified?: boolean }>(token, googleKeys, {
       issuer: ["https://accounts.google.com", "accounts.google.com"],
-      audience,
+      audience: accounts.map((a) => a.pushAudience!),
     });
-    if (payload.email !== email || payload.email_verified !== true) throw new Error("wrong account");
+    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    const match = accounts.find(
+      (a) => audiences.includes(a.pushAudience) && payload.email === a.pushEmail && payload.email_verified === true,
+    );
+    if (!match) throw new Error("wrong account");
+    return match.mode;
   } catch {
     throw new ApiError(401, "GOOGLE_PUSH_UNAUTHORIZED");
   }

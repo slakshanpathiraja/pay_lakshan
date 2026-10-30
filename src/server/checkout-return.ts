@@ -20,8 +20,8 @@ const FALLBACK: Record<ReturnStatus, ReturnStatus[]> = {
  * (App config), with `order` and `status` added. `url` is null when the app has none.
  */
 export async function checkoutReturn(orderNumber: string, result: "success" | "cancelled", sessionId?: string) {
-  const { rows } = await query<{ app_id: number; payment_status: string; status: string }>(
-    `SELECT o.app_id, o.payment_status, ${ORDER_STATE} AS status FROM orders o WHERE o.order_number = $1`,
+  const { rows } = await query<{ app_id: number; platform_id: string; payment_status: string; status: string }>(
+    `SELECT o.app_id, o.platform_id, o.payment_status, ${ORDER_STATE} AS status FROM orders o WHERE o.order_number = $1`,
     [orderNumber],
   );
   const order = rows[0];
@@ -31,7 +31,7 @@ export async function checkoutReturn(orderNumber: string, result: "success" | "c
   if (order.payment_status === "paid") status = "success";
   else if (order.status === "cancelled") status = "cancelled";
   else if (result === "cancelled") status = "cancelled";
-  else status = (await stripeSaysPaid(orderNumber, sessionId)) ? "success" : order.payment_status === "failed" ? "failed" : "pending";
+  else status = (await stripeSaysPaid(order.platform_id, orderNumber, sessionId)) ? "success" : order.payment_status === "failed" ? "failed" : "pending";
 
   const { rows: redirects } = await query<{ status: ReturnStatus; url: string }>(
     "SELECT status, url FROM app_redirects WHERE app_id = $1",
@@ -48,8 +48,8 @@ export async function checkoutReturn(orderNumber: string, result: "success" | "c
 }
 
 /** Stripe's own answer for this order's Checkout session, before our webhook has recorded it. */
-async function stripeSaysPaid(orderNumber: string, sessionId?: string) {
-  const stripe = stripeClient();
+async function stripeSaysPaid(platformId: string, orderNumber: string, sessionId?: string) {
+  const stripe = await stripeClient(platformId);
   if (!stripe || !sessionId?.startsWith("cs_")) return false;
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);

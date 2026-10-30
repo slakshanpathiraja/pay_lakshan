@@ -52,6 +52,8 @@ export interface Platform {
   id: string;
   name: string;
   is_active: boolean;
+  /** uses the test payment settings (*_TEST) */
+  is_test: boolean;
   member_count: number;
   role_count: number;
   created_at: string;
@@ -224,6 +226,9 @@ export interface Device {
   os: DeviceOs;
   model: string | null;
   is_active: boolean;
+  /** last heartbeat from the device's app (App API /heartbeat); null = never */
+  last_seen_at: string | null;
+  app_version: string | null;
   created_at: string;
 }
 

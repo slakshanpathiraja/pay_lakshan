@@ -321,12 +321,12 @@ export const api = createApi({
         platform: Platform;
         account?: { username: string; temporaryPassword: string };
       },
-      { id?: string; name: string }
+      { id?: string; name: string; isTest?: boolean }
     >({
-      query: ({ id, name }) => ({
+      query: ({ id, name, isTest }) => ({
         url: id ? `/platforms/${id}` : "/platforms",
         method: id ? "PUT" : "POST",
-        body: { name },
+        body: { name, isTest },
       }),
       invalidatesTags: ["Platforms", "Me"],
     }),

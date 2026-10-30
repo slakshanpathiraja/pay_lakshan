@@ -78,6 +78,7 @@ export const endpointAccess = {
   "appApi.verify": "public",
   "googlePlay.webhook": "public",
   "appApi.refresh": "public",
+  "appApi.heartbeat": "public",
   "smtp.list": "permission",
   "smtp.create": "permission",
   "smtp.update": "permission",

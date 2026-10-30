@@ -143,7 +143,7 @@ export function route<Id extends EndpointId>(
       }
 
       const res = await run();
-      if (res.status < 400) await bumpVersions();
+      if (res.status < 400 && !NO_VERSION_BUMP.has(id)) await bumpVersions();
       return res;
     },
   );
@@ -151,3 +151,9 @@ export function route<Id extends EndpointId>(
 
 /** GETs that must run every time: they change things (the cron) or are signed one-offs. */
 const NOT_CACHED = new Set<EndpointId>(["system.health", "appApi.verify"]);
+
+/**
+ * Writes that don't drop the cached answers: a heartbeat only moves a device's last-seen time
+ * (shown within the cache's minute), and arrives every few minutes from every device.
+ */
+const NO_VERSION_BUMP = new Set<EndpointId>(["appApi.heartbeat"]);

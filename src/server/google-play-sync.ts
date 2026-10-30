@@ -1,5 +1,6 @@
 import "server-only";
 import { currencyDigits } from "@/lib/commerce";
+import { platformsOfMode, type PayMode } from "./pay-mode";
 import type { Billing, IntervalUnit } from "@/lib/commerce";
 import { newOrderNumber, ORDER_STATE, START_PERIOD, STOP_PERIOD } from "./commerce";
 import { query, withTransaction, type DbClient } from "./db/pool";
@@ -250,7 +251,7 @@ async function attachPurchase(play: PlayClient, pkg: string, order: LinkableOrde
   }
   // an open Stripe link for the same order must not be paid as well
   if (order.checkout_session_id) {
-    await stopStripeBilling({ checkout_session_id: order.checkout_session_id, stripe_subscription_id: null });
+    await stopStripeBilling({ platform_id: order.platform_id, checkout_session_id: order.checkout_session_id, stripe_subscription_id: null });
   }
   try {
     await withTransaction(async (client) => {
@@ -459,11 +460,17 @@ export function decodePush(body: unknown): DeveloperNotification {
 }
 
 /** One notification: the purchase is read from Google again and the order follows it. */
-export async function handlePlayNotification(play: PlayClient, n: DeveloperNotification): Promise<PlayNotificationResult> {
+export async function handlePlayNotification(
+  play: PlayClient,
+  n: DeveloperNotification,
+  mode: PayMode,
+): Promise<PlayNotificationResult> {
   if (n.testNotification) return "test";
-  const { rows: apps } = await query<{ id: number }>("SELECT id FROM apps WHERE kind = 'app_id' AND identifier = $1", [
-    n.packageName,
-  ]);
+  // only apps on platforms of the Play account the push came from (test vs normal)
+  const { rows: apps } = await query<{ id: number }>(
+    `SELECT id FROM apps WHERE kind = 'app_id' AND identifier = $1 AND platform_id IN (${platformsOfMode("$2")})`,
+    [n.packageName, mode === "test"],
+  );
   const appIds = apps.map((a) => a.id);
   if (!appIds.length) return "ignored"; // another app on the same Play account
 

@@ -1,5 +1,7 @@
 import "server-only";
 import type Stripe from "stripe";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { platformsOfMode, type PayMode } from "./pay-mode";
 import type { PaymentRecordStatus } from "@/lib/commerce";
 import { START_PERIOD, STOP_PERIOD } from "./commerce";
 import { query, withTransaction, type DbClient } from "./db/pool";
@@ -191,7 +193,11 @@ async function savePayment(
   );
 }
 
-/** The order (any platform) by our metadata or by its Stripe subscription, locked. */
+/** The mode (normal / test account) of the event being handled: orders of the other mode's
+ * platforms are out of its reach. */
+const eventMode = new AsyncLocalStorage<PayMode>();
+
+/** The order (of the event's mode's platforms) by our metadata or by its Stripe subscription, locked. */
 async function lockOrder(
   client: DbClient,
   by: {
@@ -201,9 +207,10 @@ async function lockOrder(
 ) {
   const { rows } = await client.query<OrderRef>(
     `SELECT id, platform_id, app_id, billing FROM orders
-      WHERE (id = $1 AND order_number = $2) OR stripe_subscription_id = $3
+      WHERE ((id = $1 AND order_number = $2) OR stripe_subscription_id = $3)
+        AND platform_id IN (${platformsOfMode("$4")})
       ORDER BY (id = $1) DESC NULLS LAST LIMIT 1`,
-    [by.order?.id ?? null, by.order?.number ?? null, by.subscriptionId ?? null],
+    [by.order?.id ?? null, by.order?.number ?? null, by.subscriptionId ?? null, eventMode.getStore() === "test"],
   );
   return rows[0] ?? null;
 }
@@ -429,7 +436,12 @@ async function prepare(
 export async function handleStripeEvent(
   stripe: Stripe,
   event: Stripe.Event,
+  mode: PayMode,
 ): Promise<WebhookResult> {
+  return eventMode.run(mode, () => handle(stripe, event));
+}
+
+async function handle(stripe: Stripe, event: Stripe.Event): Promise<WebhookResult> {
   const { rowCount: seen } = await query(
     "SELECT 1 FROM stripe_events WHERE id = $1",
     [event.id],

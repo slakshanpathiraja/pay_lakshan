@@ -40,7 +40,8 @@ export const INCOMING_DOCS: Record<IncomingWebhook, IncomingDoc> = {
     path: "/api/stripe/webhook",
     caller: "Stripe (one endpoint for every platform)",
     verification: [
-      "The `Stripe-Signature` header is checked with `STRIPE_WEBHOOK_SECRET` before anything is read (HMAC-SHA256 over `timestamp.payload`, 5-minute tolerance).",
+      "The `Stripe-Signature` header is checked with `STRIPE_WEBHOOK_SECRET` (or `STRIPE_WEBHOOK_SECRET_TEST`) before anything is read (HMAC-SHA256 over `timestamp.payload`, 5-minute tolerance).",
+      "Test platforms (Platforms ▸ Test platform) use the `*_TEST` settings: an event signed with the test secret only changes test platforms' orders, and the other way round.",
       "Each event id is handled once — Stripe can deliver an event twice.",
       "The objects are read from Stripe again (payment, invoice), so a late or out-of-order event can't move an order the wrong way.",
       "The order must match both `order_id` and `order_number` in the metadata — other environments sharing the Stripe account can't touch it.",
@@ -48,6 +49,7 @@ export const INCOMING_DOCS: Record<IncomingWebhook, IncomingDoc> = {
     env: [
       { name: "STRIPE_SECRET_KEY", description: "Stripe Dashboard → Developers → API keys.", example: "sk_test_…" },
       { name: "STRIPE_WEBHOOK_SECRET", description: "The endpoint's signing secret (or the one `stripe listen` prints).", example: "whsec_…" },
+      { name: "STRIPE_SECRET_KEY_TEST / STRIPE_WEBHOOK_SECRET_TEST", description: "The same for test platforms — Stripe test-mode key (sk_test_…) and the test-mode endpoint's signing secret.", example: "sk_test_… / whsec_…" },
     ],
     events: [
       { name: "checkout.session.completed", effect: "One-time order paid → paid + active (period starts). Subscription order → linked to its Stripe subscription; paid by its first invoice." },
@@ -149,7 +151,8 @@ export const INCOMING_DOCS: Record<IncomingWebhook, IncomingDoc> = {
     env: [
       { name: "GOOGLE_PLAY_SERVICE_ACCOUNT", description: "The service account's JSON key (as is, or base64) — reads and acknowledges purchases, and reads products (name, base plan period) to create orders.", example: "{\"type\":\"service_account\",\"client_email\":\"play@my-project.iam.gserviceaccount.com\",…}" },
       { name: "GOOGLE_PLAY_PUSH_AUDIENCE", description: "The Audience set on the push subscription (usually the endpoint URL).", example: "https://your-domain/api/google-play/webhook" },
-      { name: "GOOGLE_PLAY_PUSH_EMAIL", description: "The service account the push subscription signs as (recommended).", example: "pubsub-push@my-project.iam.gserviceaccount.com" },
+      { name: "GOOGLE_PLAY_PUSH_EMAIL", description: "The service account the push subscription signs as.", example: "pubsub-push@my-project.iam.gserviceaccount.com" },
+      { name: "GOOGLE_PLAY_*_TEST", description: "The same three for test platforms (a second Play account / push subscription); a push is matched to its set by audience + sender and only touches that set's platforms.", example: "…_TEST" },
     ],
     events: [
       { name: "SUBSCRIPTION_PURCHASED (4)", effect: "First notification. Only the user named: an order is created (product name, price paid, base plan period — renewing = subscription, prepaid = one-time for the period). Order named: that order is linked. Either way paid, active until the expiry, acknowledged." },
